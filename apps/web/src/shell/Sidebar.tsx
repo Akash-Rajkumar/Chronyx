@@ -22,6 +22,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isConnected = connectionStatus === 'connected';
   const isConnecting = connectionStatus === 'connecting';
+  const isMock = connectionStatus === 'mock';
 
   // Anchor status calculation
   const anchorsOk =
@@ -94,7 +95,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span>Socket</span>
             <span
               className={`flex items-center gap-1 font-mono text-[11px] ${
-                isConnected
+                isMock
+                  ? 'text-accent-cyan'
+                  : isConnected
                   ? 'text-trust-trusted'
                   : isConnecting
                   ? 'text-trust-suspect'
@@ -103,14 +106,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
-                  isConnected
+                  isMock
+                    ? 'bg-accent-cyan'
+                    : isConnected
                     ? 'bg-trust-trusted'
                     : isConnecting
                     ? 'bg-trust-suspect animate-pulse'
                     : 'bg-trust-quarantined'
                 }`}
               />
-              {isConnected ? 'Connected' : isConnecting ? 'Connecting' : 'Disconnected'}
+              {isMock ? 'Mock (Simulated)' : isConnected ? 'Connected' : isConnecting ? 'Connecting' : 'Disconnected'}
             </span>
           </div>
           <div className="flex items-center justify-between">

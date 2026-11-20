@@ -27,7 +27,9 @@ import {
 import type { Snapshot } from '@chronyx/contracts';
 
 export const isMockMode = (): boolean => {
-  return typeof import.meta !== 'undefined' && import.meta.env?.['VITE_USE_MOCKS'] === 'true';
+  if (typeof import.meta === 'undefined' || !import.meta.env) return false;
+  const val = import.meta.env['VITE_USE_MOCKS'];
+  return val === 'true' || val === true || val === '1';
 };
 
 export const getMockSnapshot = (): Snapshot => {

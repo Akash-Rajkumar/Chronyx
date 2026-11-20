@@ -2,6 +2,7 @@
  * Socket.IO client for the Chronyx Dashboard (Part E2c)
  * Connects with { auth: { role: 'dashboard' } } and binds realtime streams
  * to the Zustand central store.
+ * Prevents duplicate connections and honestly represents mock vs live states.
  */
 import { io, Socket } from 'socket.io-client';
 import { SOCKET_EVENTS } from '@chronyx/contracts';
@@ -18,18 +19,34 @@ import { useDashboardStore } from '../state/useDashboardStore.js';
 import { isMockMode, getMockSnapshot } from '../mocks/mockDashboardData.js';
 
 let socket: Socket | null = null;
+let subscribersCount = 0;
 
 export function getDashboardSocket(): Socket | null {
   return socket;
 }
 
 export function initDashboardSocket(): () => void {
+  subscribersCount++;
   const store = useDashboardStore.getState();
 
+  // Mock mode: honest representation, no fake socket claimed
   if (isMockMode()) {
     store.setSnapshot(getMockSnapshot());
-    store.setConnectionStatus('connected');
-    return () => {};
+    store.setConnectionStatus('mock');
+    return () => {
+      subscribersCount = Math.max(0, subscribersCount - 1);
+    };
+  }
+
+  // Live mode: reuse existing socket if already connected or connecting
+  if (socket) {
+    return () => {
+      subscribersCount = Math.max(0, subscribersCount - 1);
+      if (subscribersCount === 0 && socket) {
+        socket.disconnect();
+        socket = null;
+      }
+    };
   }
 
   const wsUrl =
@@ -95,7 +112,8 @@ export function initDashboardSocket(): () => void {
   });
 
   return () => {
-    if (socket) {
+    subscribersCount = Math.max(0, subscribersCount - 1);
+    if (subscribersCount === 0 && socket) {
       socket.disconnect();
       socket = null;
     }

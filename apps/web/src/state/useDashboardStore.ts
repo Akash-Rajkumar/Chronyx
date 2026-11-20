@@ -13,7 +13,7 @@ import type {
 } from '@chronyx/contracts';
 import { CONTRACT_VERSION } from '@chronyx/contracts';
 
-export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
+export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'error' | 'mock';
 
 export interface DashboardState {
   contractVersion: string;

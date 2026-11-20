@@ -18,6 +18,24 @@ export const ConnectionBanner: React.FC<ConnectionBannerProps> = ({
     return null;
   }
 
+  if (status === 'mock') {
+    return (
+      <div
+        data-testid="connection-banner"
+        role="status"
+        className={`w-full py-2 px-4 bg-accent-cyan/10 border-b border-accent-cyan/30 text-accent-cyan text-xs flex items-center justify-between transition-all duration-200 ${className}`}
+      >
+        <div className="flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rounded-full bg-accent-cyan" />
+          <span className="font-medium">
+            Mock Mode Active: Displaying simulated telemetry from frozen contract fixtures.
+          </span>
+        </div>
+        <span className="font-mono text-[11px] opacity-80">VITE_USE_MOCKS=true</span>
+      </div>
+    );
+  }
+
   const isConnecting = status === 'connecting';
 
   return (

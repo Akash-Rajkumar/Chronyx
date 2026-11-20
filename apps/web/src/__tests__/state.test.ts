@@ -84,4 +84,9 @@ describe('Zustand Dashboard Store (Phase 5)', () => {
     expect(state.nodes).toHaveLength(mockSnapshot.nodes.length);
     expect(state.network).toEqual(mockSnapshot.network);
   });
+
+  it('supports mock connection status honestly', () => {
+    useDashboardStore.getState().setConnectionStatus('mock');
+    expect(useDashboardStore.getState().connectionStatus).toBe('mock');
+  });
 });
