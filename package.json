@@ -1,0 +1,32 @@
+{
+  "name": "chronyx-root",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -p \"[{name}]\" -n \"SERVER,WEB\" -c \"cyan,magenta\" \"npm run dev -w @chronyx/server\" \"npm run dev -w @chronyx/web\"",
+    "build": "tsc --build",
+    "check": "npm run check:type && npm run check:lint && npm run test",
+    "check:type": "tsc --build",
+    "check:lint": "eslint . --ext .ts,.tsx",
+    "test": "vitest run",
+    "verify": "node scripts/verify.cjs",
+    "purge-mocks": "node scripts/purge-mocks.cjs",
+    "check-no-mocks": "node scripts/check-no-mocks.cjs",
+    "db:prune": "node scripts/db-prune.cjs"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.3",
+    "typescript": "^5.5.4",
+    "vitest": "^1.6.0"
+  }
+}
