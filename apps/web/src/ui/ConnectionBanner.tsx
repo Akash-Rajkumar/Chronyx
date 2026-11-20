@@ -31,7 +31,7 @@ export const ConnectionBanner: React.FC<ConnectionBannerProps> = ({
             Mock Mode Active: Displaying simulated telemetry from frozen contract fixtures.
           </span>
         </div>
-        <span className="font-mono text-[11px] opacity-80">VITE_USE_MOCKS=true</span>
+        <span className="font-mono text-[11px] opacity-80">VITE_USE_MOCKS=1</span>
       </div>
     );
   }
