@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import {
+  useDashboardStore,
   useNetworkHealth,
   useNodes,
   useAssessments,
@@ -19,6 +20,7 @@ import { Link } from 'react-router-dom';
  * Live Overview Page (Part G4.1)
  * Owned by Person 3 (P3-T1/T3)
  * Subscribes to central Zustand store for 1 Hz telemetry and mock feeds.
+ * Implements strict data integrity for missing/unassessed values and honest cluster alerts.
  */
 export function OverviewPage() {
   // Ensure dashboard feed / mock bootstrap is active
@@ -27,15 +29,82 @@ export function OverviewPage() {
     return cleanup;
   }, []);
 
-  const network = useNetworkHealth();
-  const nodes = useNodes();
-  const assessments = useAssessments();
-  const recentTransitions = useRecentTransitions();
-  const isLoading = useIsLoading();
-  const error = useStoreError();
-  const connectionStatus = useConnectionStatus();
+  const networkHook = useNetworkHealth();
+  const nodesHook = useNodes();
+  const assessmentsHook = useAssessments();
+  const recentTransitionsHook = useRecentTransitions();
+  const isLoadingHook = useIsLoading();
+  const errorHook = useStoreError();
+  const connectionStatusHook = useConnectionStatus();
+
+  // In client (browser), use granular reactive selector hooks.
+  // In SSR / Node test renderer, read current store state.
+  const isClient = typeof window !== 'undefined';
+  const storeState = isClient ? null : useDashboardStore.getState();
+
+  const network = isClient ? networkHook : storeState!.network;
+  const nodes = isClient ? nodesHook : storeState!.nodes;
+  const assessments = isClient ? assessmentsHook : storeState!.assessments;
+  const recentTransitions = isClient ? recentTransitionsHook : storeState!.recentTransitions;
+  const isLoading = isClient ? isLoadingHook : storeState!.isLoading;
+  const error = isClient ? errorHook : storeState!.error;
+  const connectionStatus = isClient ? connectionStatusHook : storeState!.connectionStatus;
 
   const isMock = connectionStatus === 'mock';
+
+  // Compute honest alert strip state
+  const hasTransitions = recentTransitions.length > 0;
+  const latestTransition = recentTransitions[0];
+
+  let alertMessage: React.ReactNode;
+  let alertStyle = 'bg-card/50 border-border/60 text-muted';
+
+  if (hasTransitions && latestTransition) {
+    alertStyle = 'bg-trust-suspect/10 border-trust-suspect/30 text-trust-suspect';
+    alertMessage = (
+      <div className="flex items-center justify-between">
+        <span>
+          <strong>State Transition:</strong> Node {latestTransition.node_id.slice(0, 8)} transitioned from{' '}
+          <span className="font-mono uppercase">{latestTransition.from}</span> to{' '}
+          <span className="font-mono uppercase">{latestTransition.to}</span>
+          {latestTransition.reasons.length > 0 && ` (${latestTransition.reasons.join(', ')})`}
+        </span>
+        <span className="font-mono text-[11px] opacity-75">
+          offset: {latestTransition.error_est_ms.toFixed(2)} ms
+        </span>
+      </div>
+    );
+  } else if (network && network.n > 0) {
+    const hasAnomalies = network.quarantined > 0 || network.suspect > 0;
+    const allTrusted = network.trusted === network.n && !hasAnomalies;
+
+    if (allTrusted) {
+      alertStyle = 'bg-trust-trusted/10 border-trust-trusted/30 text-trust-trusted';
+      alertMessage = (
+        <span>
+          <strong>Cluster Operational:</strong> All {network.n} nodes trusted and calibrated. Zero active anomalies.
+        </span>
+      );
+    } else if (hasAnomalies) {
+      alertStyle = 'bg-trust-quarantined/10 border-trust-quarantined/30 text-trust-quarantined';
+      alertMessage = (
+        <span>
+          <strong>Cluster Anomaly Active:</strong> {network.quarantined} quarantined, {network.suspect} suspect out of {network.n} nodes.
+        </span>
+      );
+    } else {
+      alertStyle = 'bg-card/50 border-border/60 text-muted';
+      alertMessage = (
+        <span>
+          Cluster active ({network.trusted}/{network.n} trusted, {network.recovering} recovering). No recent transitions.
+        </span>
+      );
+    }
+  } else {
+    // Empty or unavailable network data: neutral message
+    alertStyle = 'bg-card/50 border-border/60 text-muted';
+    alertMessage = <span>Observatory cluster standby. Telemetry status unavailable.</span>;
+  }
 
   return (
     <div className="space-y-6">
@@ -46,7 +115,7 @@ export function OverviewPage() {
             <h2 className="text-xl font-bold tracking-tight text-foreground">Observatory Overview</h2>
             {isMock && (
               <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded bg-accent-cyan/10 border border-accent-cyan/30 text-accent-cyan">
-                SIMULATED (MOCK)
+                SIMULATED (MOCK) — VITE_USE_MOCKS=1
               </span>
             )}
           </div>
@@ -73,36 +142,13 @@ export function OverviewPage() {
         </div>
       </div>
 
-      {/* Alert Strip: Latest state transition or operational calm */}
-      {(() => {
-        const latest = recentTransitions[0];
-        return (
-          <div
-            data-testid="alert-strip"
-            className={`p-3 rounded-lg text-xs border transition-colors ${
-              latest
-                ? 'bg-trust-suspect/10 border-trust-suspect/30 text-trust-suspect'
-                : 'bg-card/50 border-border/60 text-muted'
-            }`}
-          >
-            {latest ? (
-              <div className="flex items-center justify-between">
-                <span>
-                  <strong>State Transition:</strong> Node {latest.node_id.slice(0, 8)} transitioned from{' '}
-                  <span className="font-mono uppercase">{latest.from}</span> to{' '}
-                  <span className="font-mono uppercase">{latest.to}</span>
-                  {latest.reasons.length > 0 && ` (${latest.reasons.join(', ')})`}
-                </span>
-                <span className="font-mono text-[11px] opacity-75">
-                  offset: {latest.error_est_ms.toFixed(2)} ms
-                </span>
-              </div>
-            ) : (
-              <span>No recent transitions. All nodes operational.</span>
-            )}
-          </div>
-        );
-      })()}
+      {/* Alert Strip: Transition or honest cluster state */}
+      <div
+        data-testid="alert-strip"
+        className={`p-3 rounded-lg text-xs border transition-colors ${alertStyle}`}
+      >
+        {alertMessage}
+      </div>
 
       {/* Error State Banner */}
       {error && (
@@ -135,8 +181,8 @@ export function OverviewPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {nodes.map((node) => {
             const assessment = assessments[node.id];
-            const trustState = assessment?.state || 'trusted';
-            const confidence = assessment?.confidence ?? 1;
+            const hasAssessment = Boolean(assessment);
+            const hasConfidence = assessment?.confidence !== undefined && assessment?.confidence !== null;
 
             return (
               <div
@@ -162,17 +208,41 @@ export function OverviewPage() {
                     </span>
                   </div>
 
-                  <StateChip state={trustState} size="sm" />
+                  {/* Trust State Chip: Never default missing to Trusted */}
+                  {hasAssessment && assessment ? (
+                    <StateChip state={assessment.state} size="sm" />
+                  ) : (
+                    <span
+                      data-testid="state-chip"
+                      className="inline-flex items-center rounded-md font-mono text-[11px] px-2 py-0.5 border border-muted/30 bg-muted/10 text-muted"
+                      title="Node awaiting first engine assessment"
+                    >
+                      Unassessed
+                    </span>
+                  )}
                 </div>
 
                 {/* Primary Metrics: Confidence Ring & Error Offset */}
                 <div className="flex items-center justify-between pt-1 border-t border-border/40">
-                  <ConfidenceRing
-                    confidence={confidence}
-                    size={48}
-                    strokeWidth={3.5}
-                    label="Confidence"
-                  />
+                  {/* Confidence Ring: Never default missing to 1 or 0% */}
+                  {hasConfidence && assessment ? (
+                    <ConfidenceRing
+                      confidence={assessment.confidence}
+                      size={48}
+                      strokeWidth={3.5}
+                      label="Confidence"
+                    />
+                  ) : (
+                    <div
+                      data-testid="confidence-ring"
+                      className="inline-flex flex-col items-center justify-center gap-1"
+                    >
+                      <div className="h-12 w-12 rounded-full border border-dashed border-border/80 flex items-center justify-center">
+                        <span className="font-mono text-xs text-muted">--</span>
+                      </div>
+                      <span className="text-[11px] text-muted text-center">Confidence</span>
+                    </div>
+                  )}
 
                   <div className="text-right space-y-1">
                     <div>
@@ -193,15 +263,13 @@ export function OverviewPage() {
                 </div>
 
                 {/* Residual and Z-score summary */}
-                {assessment && (
-                  <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[11px] font-mono text-muted">
-                    <span>z: {assessment.z.toFixed(2)}</span>
-                    <span>cusum: {assessment.cusum.toFixed(2)}σ</span>
-                    <span className={node.online ? 'text-trust-trusted' : 'text-muted'}>
-                      {node.online ? 'Online' : 'Offline'}
-                    </span>
-                  </div>
-                )}
+                <div className="pt-2 border-t border-border/40 flex items-center justify-between text-[11px] font-mono text-muted">
+                  <span>z: {assessment ? assessment.z.toFixed(2) : '--'}</span>
+                  <span>cusum: {assessment ? `${assessment.cusum.toFixed(2)}σ` : '--'}</span>
+                  <span className={node.online ? 'text-trust-trusted' : 'text-muted'}>
+                    {node.online ? 'Online' : 'Offline'}
+                  </span>
+                </div>
               </div>
             );
           })}
