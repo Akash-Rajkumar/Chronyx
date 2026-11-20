@@ -3,9 +3,10 @@
  * Connects with { auth: { role: 'dashboard' } } and binds realtime streams
  * to the Zustand central store.
  * Prevents duplicate connections and honestly represents mock vs live states.
+ * Resilient to mock purge by importing contract fixtures directly.
  */
 import { io, Socket } from 'socket.io-client';
-import { SOCKET_EVENTS } from '@chronyx/contracts';
+import { SOCKET_EVENTS, mockSnapshot } from '@chronyx/contracts';
 import type {
   Snapshot,
   Assessment,
@@ -16,10 +17,14 @@ import type {
   AnchorInfo,
 } from '@chronyx/contracts';
 import { useDashboardStore } from '../state/useDashboardStore.js';
-import { isMockMode, getMockSnapshot } from '../mocks/mockDashboardData.js';
 
 let socket: Socket | null = null;
 let subscribersCount = 0;
+
+export const isMockMode = (): boolean => {
+  if (typeof import.meta === 'undefined' || !import.meta.env) return false;
+  return import.meta.env['VITE_USE_MOCKS'] === '1';
+};
 
 export function getDashboardSocket(): Socket | null {
   return socket;
@@ -29,9 +34,9 @@ export function initDashboardSocket(): () => void {
   subscribersCount++;
   const store = useDashboardStore.getState();
 
-  // Mock mode: honest representation, no fake socket claimed
+  // Mock mode: honest representation, only activates when VITE_USE_MOCKS=1
   if (isMockMode()) {
-    store.setSnapshot(getMockSnapshot());
+    store.setSnapshot(JSON.parse(JSON.stringify(mockSnapshot)));
     store.setConnectionStatus('mock');
     return () => {
       subscribersCount = Math.max(0, subscribersCount - 1);

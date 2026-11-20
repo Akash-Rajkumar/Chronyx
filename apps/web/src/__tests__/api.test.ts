@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { api, ApiError } from '../api/client.js';
-import { ROUTES } from '@chronyx/contracts';
-import { isMockMode, getMockSnapshot } from '../mocks/mockDashboardData.js';
+import { isMockMode } from '../api/socket.js';
+import { ROUTES, mockSnapshot } from '@chronyx/contracts';
 
 describe('API & Mock Isolation (C1, C3, C4)', () => {
   beforeEach(() => {
@@ -34,7 +34,7 @@ describe('API & Mock Isolation (C1, C3, C4)', () => {
     });
 
     it('mock mode snapshot provides valid fixture structure', () => {
-      const snapshot = getMockSnapshot();
+      const snapshot = JSON.parse(JSON.stringify(mockSnapshot));
       expect(snapshot.contract_version).toBe('1.0.0');
       expect(snapshot.nodes).toBeDefined();
       expect(snapshot.assessments).toBeDefined();
@@ -43,7 +43,7 @@ describe('API & Mock Isolation (C1, C3, C4)', () => {
 
   describe('C3 — Strict Zod Validation', () => {
     it('returns parsed data on valid schema response', async () => {
-      const mockState = getMockSnapshot();
+      const mockState = JSON.parse(JSON.stringify(mockSnapshot));
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
         status: 200,
