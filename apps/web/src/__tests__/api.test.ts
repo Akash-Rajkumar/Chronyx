@@ -1,3 +1,4 @@
+// TEST-FIXTURE
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { api, ApiError } from '../api/client.js';
 import { isMockMode } from '../api/socket.js';
