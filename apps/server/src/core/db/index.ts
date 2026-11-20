@@ -14,6 +14,7 @@ import { getDbClient, isDbConfigured } from './client.js';
 
 export * from './schema.js';
 export * from './client.js';
+export * from './prune.js';
 export * from './repositories/nodesRepo.js';
 export * from './repositories/heartbeatsRepo.js';
 export * from './repositories/assessmentsRepo.js';

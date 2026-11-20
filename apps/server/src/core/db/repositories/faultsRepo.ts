@@ -70,3 +70,4 @@ export class FaultsRepository {
     return data;
   }
 }
+

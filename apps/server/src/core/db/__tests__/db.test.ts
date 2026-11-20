@@ -47,3 +47,4 @@ describe('apps/server/src/core/db repository layer unit tests', () => {
     expect(repos.config).toBeInstanceOf(ConfigRepository);
   });
 });
+

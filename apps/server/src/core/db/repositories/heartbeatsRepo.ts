@@ -46,13 +46,22 @@ export class HeartbeatsRepository {
     return data || [];
   }
 
+  /**
+   * Deletes heartbeats older than cutoffMs that have empty flags.
+   * Master Prompt Part E3:
+   * "deletes heartbeats older than 3 hours that have empty flags"
+   *
+   * In PostgreSQL, flags is defined as text[] not null default '{}'.
+   * In PostgREST / Supabase, filtering an array column for empty requires
+   * the PostgreSQL empty array literal '{}' (flags=eq.{}).
+   * Using [] results in flags=eq. (empty string), which does not match '{}'.
+   */
   async pruneOlderThan(cutoffMs: number): Promise<number> {
-    // E3: Deletes heartbeats older than 3 hours that have empty flags
     const { data, error } = await this.client
       .from('heartbeats')
       .delete()
       .lt('t_rx_ms', cutoffMs)
-      .eq('flags', [])
+      .filter('flags', 'eq', '{}')
       .select('id');
 
     if (error) {

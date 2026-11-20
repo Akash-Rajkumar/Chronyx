@@ -35,3 +35,4 @@ export function getDbClient(): SupabaseClient<ChronyxDatabase> | null {
     return null;
   }
 }
+
