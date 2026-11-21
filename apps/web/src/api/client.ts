@@ -15,6 +15,7 @@ import {
   EngineConfigSchema,
   IncidentSummarySchema,
   IncidentSchema,
+  ObservationCreateSchema,
   ObservationSchema,
   PassportSchema,
   FaultSchema,
@@ -34,6 +35,7 @@ import type {
   IncidentSummary,
   Incident,
   Observation,
+  ObservationCreate,
   Passport,
   Fault,
   FaultSpec,
@@ -50,7 +52,20 @@ import type {
 } from '@chronyx/contracts';
 import { z } from 'zod';
 
-const API_BASE = (typeof import.meta !== 'undefined' && import.meta.env?.['VITE_API_URL']) || 'http://localhost:3001';
+export function getApiBaseUrl(): string {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.['VITE_API_URL']) {
+    return import.meta.env['VITE_API_URL'];
+  }
+  if (typeof window !== 'undefined') {
+    if (window.location.port === '5173' || window.location.port === '4173') {
+      return `${window.location.protocol}//${window.location.hostname}:3001`;
+    }
+    return window.location.origin;
+  }
+  return 'http://localhost:3001';
+}
+
+const API_BASE = getApiBaseUrl();
 
 export class ApiError extends Error {
   code: string;
@@ -150,6 +165,10 @@ export const api = {
     );
   },
 
+  getNodeEvidenceBundle: async (id: string): Promise<Record<string, unknown>> => {
+    return request<Record<string, unknown>>(ROUTES.NODE_EVIDENCE_BUNDLE(id));
+  },
+
   sendHeartbeat: async (hb: Heartbeat): Promise<HeartbeatAck> => {
     return request<HeartbeatAck>(
       ROUTES.HEARTBEATS,
@@ -192,8 +211,23 @@ export const api = {
     return request<Incident>(ROUTES.INCIDENT_BY_ID(id), undefined, IncidentSchema);
   },
 
+  exportIncident: async (id: string): Promise<Record<string, unknown>> => {
+    return request<Record<string, unknown>>(ROUTES.INCIDENT_EXPORT(id));
+  },
+
   getObservations: async (): Promise<Observation[]> => {
     return request<Observation[]>(ROUTES.OBSERVATIONS, undefined, z.array(ObservationSchema));
+  },
+
+  createObservation: async (data: ObservationCreate): Promise<Observation> => {
+    return request<Observation>(
+      ROUTES.OBSERVATIONS,
+      {
+        method: 'POST',
+        body: JSON.stringify(ObservationCreateSchema.parse(data)),
+      },
+      ObservationSchema,
+    );
   },
 
   getPassport: async (id: string): Promise<Passport> => {

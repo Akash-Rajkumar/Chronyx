@@ -2,7 +2,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { api, ApiError } from '../api/client.js';
 import { isMockMode } from '../api/socket.js';
-import { ROUTES, mockSnapshot } from '@chronyx/contracts';
+import { ROUTES, mockSnapshot, CONTRACT_VERSION } from '@chronyx/contracts';
+import type { ObservationCreate } from '@chronyx/contracts';
 
 describe('API & Mock Isolation (C1, C3, C4)', () => {
   beforeEach(() => {
@@ -36,7 +37,7 @@ describe('API & Mock Isolation (C1, C3, C4)', () => {
 
     it('mock mode snapshot provides valid fixture structure', () => {
       const snapshot = JSON.parse(JSON.stringify(mockSnapshot));
-      expect(snapshot.contract_version).toBe('1.0.0');
+      expect(snapshot.contract_version).toBe(CONTRACT_VERSION);
       expect(snapshot.nodes).toBeDefined();
       expect(snapshot.assessments).toBeDefined();
     });
@@ -52,7 +53,7 @@ describe('API & Mock Isolation (C1, C3, C4)', () => {
       } as Response);
 
       const data = await api.getState();
-      expect(data.contract_version).toBe('1.0.0');
+      expect(data.contract_version).toBe(CONTRACT_VERSION);
       expect(data.nodes).toHaveLength(mockState.nodes.length);
     });
 
@@ -177,6 +178,82 @@ describe('API & Mock Isolation (C1, C3, C4)', () => {
       const call = fetchSpy.mock.calls[0]!;
       const body = JSON.parse(call[1]?.body as string);
       expect(body).toEqual({});
+    });
+  });
+
+  describe('createObservation', () => {
+    const validPayload: ObservationCreate = {
+      node_id: '00000000-0000-0000-0000-000000000001',
+      kind: 'occultation_timing',
+      observed_at_ms: 1700000000000,
+      payload: { station: 'S1', duration_ms: 120.5 },
+    };
+
+    const validObservation = {
+      id: '11111111-1111-1111-1111-111111111111',
+      node_id: '00000000-0000-0000-0000-000000000001',
+      kind: 'occultation_timing',
+      observed_at_ms: 1700000000000,
+      payload: { station: 'S1', duration_ms: 120.5 },
+      status: 'accepted',
+      confidence: 0.95,
+      state_at_ingest: 'trusted',
+      created_at: new Date().toISOString(),
+    };
+
+    it('sends POST to ROUTES.OBSERVATIONS with exact request payload', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => validObservation,
+      } as Response);
+
+      await api.createObservation(validPayload);
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchSpy.mock.calls[0]!;
+      expect(url).toContain(ROUTES.OBSERVATIONS);
+      expect(init?.method).toBe('POST');
+      expect((init?.headers as Record<string, string>)?.['Content-Type']).toBe('application/json');
+      expect(JSON.parse(init?.body as string)).toEqual(validPayload);
+    });
+
+    it('returns a valid parsed Observation on success', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        json: async () => validObservation,
+      } as Response);
+
+      const result = await api.createObservation(validPayload);
+      expect(result.id).toBe(validObservation.id);
+      expect(result.node_id).toBe(validPayload.node_id);
+      expect(result.status).toBe('accepted');
+      expect(result.confidence).toBe(0.95);
+    });
+
+    it('rejects an invalid response with ApiError', async () => {
+      const invalidResponse = { id: 'not-a-uuid' };
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => invalidResponse,
+      } as Response);
+
+      await expect(api.createObservation(validPayload)).rejects.toThrow(ApiError);
+    });
+
+    it('preserves existing HTTP error behavior', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        json: async () => ({
+          error: { message: 'Invalid node ID or observation payload', code: 'BAD_REQUEST' },
+        }),
+      } as Response);
+
+      await expect(api.createObservation(validPayload)).rejects.toThrow('Invalid node ID or observation payload');
     });
   });
 });
