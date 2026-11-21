@@ -18,7 +18,6 @@ import { Button } from '../../ui/Button.js';
 import { EmptyState } from '../../ui/EmptyState.js';
 import { InfoTip } from '../../ui/InfoTip.js';
 import { Skeleton } from '../../ui/Skeleton.js';
-import { GlassPanel, LiquidGlassShell } from '../../present/LiquidGlass.js';
 
 const DEFAULT_TRIALS = 200;
 const DEFAULT_SEED = 42;
@@ -105,26 +104,26 @@ function OccultationSvg({
   const viewBox = computeSvgViewBox(truth, fitted, stations);
 
   return (
-    <div className="rounded-xl bg-[#040814]/65 border border-white/15 p-2 backdrop-blur-md shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+    <div className="mc-well rounded-[10px] p-2">
       <svg
         viewBox={viewBox}
-        className="w-full h-52 rounded-lg"
+        className="w-full h-52 rounded-[8px]"
         role="img"
         aria-label={title}
       >
         <title>{title}</title>
 
-        {/* Illuminated observatory reticle grid */}
-        <line x1={-900} y1={-150} x2={900} y2={-150} stroke="rgba(139,92,246,0.16)" strokeWidth={1} />
-        <line x1={-900} y1={150} x2={900} y2={150} stroke="rgba(139,92,246,0.16)" strokeWidth={1} />
-        <line x1={-250} y1={-450} x2={-250} y2={450} stroke="rgba(56,189,248,0.16)" strokeWidth={1} />
-        <line x1={250} y1={-450} x2={250} y2={450} stroke="rgba(56,189,248,0.16)" strokeWidth={1} />
+        {/* Observatory Reticle Grid */}
+        <line x1={-900} y1={-150} x2={900} y2={-150} stroke="rgba(148,163,184,0.12)" strokeWidth={1} />
+        <line x1={-900} y1={150} x2={900} y2={150} stroke="rgba(148,163,184,0.12)" strokeWidth={1} />
+        <line x1={-250} y1={-450} x2={-250} y2={450} stroke="rgba(148,163,184,0.12)" strokeWidth={1} />
+        <line x1={250} y1={-450} x2={250} y2={450} stroke="rgba(148,163,184,0.12)" strokeWidth={1} />
         <line
           x1={-900}
           y1={0}
           x2={900}
           y2={0}
-          stroke="rgba(148,163,184,0.30)"
+          stroke="rgba(148,163,184,0.28)"
           strokeWidth={1}
           strokeDasharray="4 4"
         />
@@ -133,7 +132,7 @@ function OccultationSvg({
           y1={-450}
           x2={0}
           y2={450}
-          stroke="rgba(148,163,184,0.30)"
+          stroke="rgba(148,163,184,0.28)"
           strokeWidth={1}
           strokeDasharray="4 4"
         />
@@ -144,9 +143,9 @@ function OccultationSvg({
           cy={-truth.y0}
           rx={Math.abs(truth.a)}
           ry={Math.abs(truth.b)}
-          fill="rgba(52, 211, 153, 0.12)"
-          stroke="#34D399"
-          strokeWidth={2.5}
+          fill="rgba(61, 220, 151, 0.1)"
+          stroke="#3DDC97"
+          strokeWidth={2.4}
         />
 
         {/* Station chords */}
@@ -165,8 +164,8 @@ function OccultationSvg({
                   stroke="#CBD5E1"
                   strokeWidth={2}
                 />
-                <circle cx={-halfX} cy={-st.y_m} r={4.5} fill="#34D399" />
-                <circle cx={halfX} cy={-st.y_m} r={4.5} fill="#34D399" />
+                <circle cx={-halfX} cy={-st.y_m} r={4} fill="#3DDC97" />
+                <circle cx={halfX} cy={-st.y_m} r={4} fill="#3DDC97" />
               </g>
             );
           }
@@ -176,7 +175,7 @@ function OccultationSvg({
           const strokeColor = st.dropped
             ? '#94A3B8'
             : st.faulty
-              ? '#FB7185'
+              ? '#FF5C5C'
               : '#CBD5E1';
           return (
             <g key={st.idx} opacity={st.dropped ? 0.35 : 1}>
@@ -186,11 +185,11 @@ function OccultationSvg({
                 x2={x2}
                 y2={-st.y_m}
                 stroke={strokeColor}
-                strokeWidth={st.faulty ? 3 : 2}
+                strokeWidth={st.faulty ? 2.8 : 2}
                 strokeDasharray={st.dropped ? '6 4' : undefined}
               />
-              <circle cx={x1} cy={-st.y_m} r={4.5} fill={strokeColor} />
-              <circle cx={x2} cy={-st.y_m} r={4.5} fill={strokeColor} />
+              <circle cx={x1} cy={-st.y_m} r={4} fill={strokeColor} />
+              <circle cx={x2} cy={-st.y_m} r={4} fill={strokeColor} />
             </g>
           );
         })}
@@ -204,7 +203,7 @@ function OccultationSvg({
             ry={Math.abs(fitted.b)}
             fill="none"
             stroke={fittedColor}
-            strokeWidth={3.2}
+            strokeWidth={3}
             strokeDasharray="10 6"
           />
         )}
@@ -296,316 +295,290 @@ export function SciencePage() {
   const impliedChordShiftM = faultMs * 20;
 
   return (
-    <LiquidGlassShell accent="violet" speed={1.1} dimmed={isReconnecting}>
-      {/* Liquid-Glass Science Header + Physical Sensitivity Callout */}
-      <GlassPanel tone="violet" padding="p-4 sm:p-5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-violet-300">
-                Occultation Geometry Console
-              </span>
-              <span className="inline-flex items-center text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-full bg-violet-400/18 border border-violet-300/40 text-violet-200">
-                Simulated geometry
-              </span>
-              {isMock && (
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-full bg-cyan-400/15 border border-cyan-300/45 text-cyan-200 shadow-[0_0_14px_rgba(61,214,245,0.22)]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" aria-hidden="true" />
-                  SIMULATED (MOCK)
-                </span>
-              )}
-            </div>
-            <h2 className="text-2xl font-bold tracking-tight text-white">
+    <div
+      className={`space-y-5 transition-opacity duration-[180ms] ease-out ${
+        isReconnecting ? 'opacity-70' : 'opacity-100'
+      }`}
+    >
+      {/* Header + Physics Sensitivity Callout */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground">
               Science Impact Replay
             </h2>
-            <p className="text-sm text-slate-300">
-              Visualizing how a single timing fault distorts an asteroid chord fit vs quarantining it
-            </p>
+            <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-[6px] bg-indigo-500/12 border border-indigo-400/30 text-indigo-200">
+              Simulated geometry
+            </span>
+            {isMock && (
+              <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-[6px] bg-amber-500/12 border border-amber-400/30 text-amber-200">
+                SIMULATED (MOCK)
+              </span>
+            )}
           </div>
-
-          <div className="px-4 py-3 rounded-xl bg-black/35 border border-cyan-300/35 backdrop-blur-md flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-4 shrink-0 shadow-[0_0_24px_rgba(139,92,246,0.16)]">
-            <div className="text-xs text-slate-100">
-              <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-cyan-300 block">
-                Physical Sensitivity
-              </span>
-              <span>At 20 km/s, 1 ms of timing error moves a chord by 20 m.</span>
-            </div>
-            <div className="sm:border-l sm:border-white/15 sm:pl-4 font-mono tabular-nums">
-              <span className="text-[10px] uppercase tracking-wider text-violet-200/80 block">
-                Chord shift
-              </span>
-              <span className="text-base font-bold text-cyan-200">
-                {`${impliedChordShiftM.toFixed(0)} m`}
-              </span>
-            </div>
-          </div>
+          <p className="text-sm text-muted">
+            How one faulty station clock distorts an asteroid chord fit vs quarantining it
+          </p>
         </div>
-      </GlassPanel>
 
-      {/* Compact Liquid-Glass Controls */}
-      <GlassPanel tone="default" padding="p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-          {/* Fault size slider 0..20 ms */}
-          <div className="lg:col-span-4 p-3.5 rounded-xl bg-black/30 border border-white/12">
-            <label className="block space-y-2 text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-slate-200 flex items-center gap-1">
-                  Injected fault size (ms)
-                  <InfoTip text="Timing offset injected into the faulty occultation station before ellipse fitting." />
-                </span>
-                <span className="font-mono font-bold text-cyan-200 px-2 py-0.5 rounded-md bg-cyan-400/15 border border-cyan-300/40 tabular-nums">
-                  {`${faultMs.toFixed(1)} ms`}
-                </span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={20}
-                step={0.5}
-                value={faultMs}
-                onChange={(e) => setFaultMs(Number(e.target.value))}
-                className="w-full accent-cyan-400"
-                aria-label="Fault size in milliseconds"
-              />
-              <div className="flex justify-between text-[10px] font-mono text-slate-400">
-                <span>0 ms</span>
-                <span>10 ms</span>
-                <span>20 ms</span>
-              </div>
-            </label>
+        <div className="mc-panel-primary mc-ticks rounded-[12px] px-4 py-3 flex items-center gap-4 shrink-0">
+          <div className="text-xs">
+            <span className="text-[11px] font-mono text-accent-cyan block">
+              Physical Sensitivity
+            </span>
+            <span className="text-foreground">
+              At 20 km/s, 1 ms of timing error moves a chord by 20 m.
+            </span>
           </div>
-
-          {/* Faulty station selector 0..5 */}
-          <div className="lg:col-span-5 space-y-2 text-xs">
-            <span className="text-slate-200 font-medium block">Faulty station (cross-track y)</span>
-            <div className="grid grid-cols-3 gap-1.5">
-              {STATION_INDICES.map((idx) => {
-                const yM = SCIENCE_DEFAULTS.stations_y[idx];
-                const isSelected = faultyStation === idx;
-                return (
-                  <button
-                    key={idx}
-                    type="button"
-                    aria-pressed={isSelected}
-                    onClick={() => setFaultyStation(idx)}
-                    className={`px-2.5 py-2 rounded-xl font-mono text-[11px] border transition-all hover:-translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-violet-300/60 ${
-                      isSelected
-                        ? 'bg-violet-400/22 border-violet-300/60 text-white font-semibold shadow-[0_0_18px_rgba(139,92,246,0.28)]'
-                        : 'bg-white/[0.045] border-white/12 text-slate-300 hover:bg-white/[0.08] hover:border-white/25'
-                    }`}
-                  >
-                    {`S${idx + 1} (${yM}m)`}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Use live fault button */}
-          <div className="lg:col-span-3 flex flex-col items-start lg:items-end gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!liveFaultCopy.supported}
-              title={
-                liveFaultCopy.supported
-                  ? `Copy injected ${liveFaultCopy.faultType} offset_ms (${liveFaultCopy.sizeMs.toFixed(1)} ms)`
-                  : liveFaultCopy.reason
-              }
-              onClick={handleUseLiveFault}
-              className="bg-white/[0.08] border-white/20 text-white hover:bg-cyan-400/20 hover:border-cyan-300/45 hover:-translate-y-[1px]"
-            >
-              Use the live fault
-            </Button>
-            <span className="text-[11px] font-mono text-slate-300/85 lg:text-right tabular-nums leading-snug">
-              {liveFaultCopy.supported
-                ? `Active ${liveFaultCopy.faultType}: ${liveFaultCopy.sizeMs.toFixed(1)} ms (params.offset_ms)`
-                : liveFaultCopy.reason}
+          <div className="border-l border-white/[0.1] pl-4 font-mono tabular-nums text-right">
+            <span className="text-[10px] text-muted block">Chord shift</span>
+            <span className="text-base font-semibold text-accent-cyan">
+              {impliedChordShiftM.toFixed(0)} m
             </span>
           </div>
         </div>
-      </GlassPanel>
+      </div>
 
-      {/* Error banner (when prior data exists) */}
-      {error && hasData && (
-        <GlassPanel tone="coral" padding="px-4 py-3">
-          <div className="text-xs text-rose-200 flex items-center justify-between gap-3">
-            <span>Replay update failed: {error}</span>
-            <button
-              type="button"
-              onClick={() => void runReplay(faultMs, faultyStation)}
-              className="underline font-semibold hover:text-white"
-            >
-              Retry
-            </button>
+      {/* Compact Instrument Controls */}
+      <div className="mc-panel rounded-[14px] p-4 grid grid-cols-1 lg:grid-cols-12 gap-5 items-center">
+        <div className="lg:col-span-4 mc-well rounded-[10px] p-3.5">
+          <label className="block space-y-2 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-muted flex items-center gap-1">
+                Injected fault size (ms)
+                <InfoTip text="Timing offset injected into the faulty occultation station before ellipse fitting." />
+              </span>
+              <span className="font-mono font-semibold text-accent-cyan tabular-nums">
+                {faultMs.toFixed(1)} ms
+              </span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={20}
+              step={0.5}
+              value={faultMs}
+              onChange={(e) => setFaultMs(Number(e.target.value))}
+              className="w-full accent-accent-cyan"
+              aria-label="Fault size in milliseconds"
+            />
+            <div className="flex justify-between text-[10px] font-mono text-muted">
+              <span>0 ms</span>
+              <span>10 ms</span>
+              <span>20 ms</span>
+            </div>
+          </label>
+        </div>
+
+        <div className="lg:col-span-5 space-y-2 text-xs">
+          <span className="text-muted font-medium block">Faulty station (cross-track y)</span>
+          <div className="grid grid-cols-3 gap-1.5">
+            {STATION_INDICES.map((idx) => {
+              const yM = SCIENCE_DEFAULTS.stations_y[idx];
+              const isSelected = faultyStation === idx;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  aria-pressed={isSelected}
+                  onClick={() => setFaultyStation(idx)}
+                  className={`px-2.5 py-2 rounded-[8px] font-mono text-[11px] border transition-[background-color,border-color,color] duration-[160ms] ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 ${
+                    isSelected
+                      ? 'bg-accent-cyan/[0.14] border-accent-cyan/60 text-accent-cyan font-semibold'
+                      : 'bg-black/30 border-white/[0.1] text-muted hover:border-white/[0.22] hover:text-foreground'
+                  }`}
+                >
+                  {`S${idx + 1} (${yM}m)`}
+                </button>
+              );
+            })}
           </div>
-        </GlassPanel>
+        </div>
+
+        <div className="lg:col-span-3 flex flex-col items-start lg:items-end gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!liveFaultCopy.supported}
+            title={
+              liveFaultCopy.supported
+                ? `Copy injected ${liveFaultCopy.faultType} offset_ms (${liveFaultCopy.sizeMs.toFixed(1)} ms)`
+                : liveFaultCopy.reason
+            }
+            onClick={handleUseLiveFault}
+          >
+            Use the live fault
+          </Button>
+          <span className="text-[11px] font-mono text-muted lg:text-right tabular-nums leading-snug">
+            {liveFaultCopy.supported
+              ? `Active ${liveFaultCopy.faultType}: ${liveFaultCopy.sizeMs.toFixed(1)} ms (params.offset_ms)`
+              : liveFaultCopy.reason}
+          </span>
+        </div>
+      </div>
+
+      {error && hasData && (
+        <div className="mc-well border-rose-400/30 border-l-2 border-l-trust-quarantined rounded-[10px] px-4 py-3 text-xs text-rose-100 flex items-center justify-between gap-3">
+          <span>Replay update failed: {error}</span>
+          <button
+            type="button"
+            onClick={() => void runReplay(faultMs, faultyStation)}
+            className="underline font-medium hover:text-white"
+          >
+            Retry
+          </button>
+        </div>
       )}
 
-      {/* Main 3-Panel Scientific Story: Truth -> Fault trusted -> Fault quarantined */}
+      {/* Three-Panel Occultation Comparison */}
       {loading && !hasData ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           <div data-testid="science-panel-truth">
-            <Skeleton height={330} />
+            <Skeleton height={320} />
           </div>
           <div data-testid="science-panel-trusted">
-            <Skeleton height={330} />
+            <Skeleton height={320} />
           </div>
           <div data-testid="science-panel-quarantined">
-            <Skeleton height={330} />
+            <Skeleton height={320} />
           </div>
         </div>
       ) : error && !hasData ? (
-        <GlassPanel tone="coral">
-          <EmptyState
-            title="Unable to compute science replay"
-            description={error}
-            action={
-              <Button
-                variant="primary"
-                size="sm"
-                onClick={() => void runReplay(faultMs, faultyStation)}
-              >
-                Retry
-              </Button>
-            }
-          />
-        </GlassPanel>
+        <EmptyState
+          title="Unable to compute science replay"
+          description={error}
+          action={
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => void runReplay(faultMs, faultyStation)}
+            >
+              Retry
+            </Button>
+          }
+        />
       ) : !hasData ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div data-testid="science-panel-truth">
-            <GlassPanel tone="emerald" padding="p-4">
-              <span className="text-xs text-slate-300">Truth — waiting for replay response</span>
-            </GlassPanel>
+          <div data-testid="science-panel-truth" className="mc-panel rounded-[14px] p-4 text-xs text-muted">
+            Truth — waiting for replay response
           </div>
-          <div data-testid="science-panel-trusted">
-            <GlassPanel tone="coral" padding="p-4">
-              <span className="text-xs text-slate-300">
-                Fault trusted — waiting for replay response
-              </span>
-            </GlassPanel>
+          <div data-testid="science-panel-trusted" className="mc-panel rounded-[14px] p-4 text-xs text-muted">
+            Fault trusted — waiting for replay response
           </div>
-          <div data-testid="science-panel-quarantined">
-            <GlassPanel tone="cyan" padding="p-4">
-              <span className="text-xs text-slate-300">
-                Fault quarantined — waiting for replay response
-              </span>
-            </GlassPanel>
+          <div data-testid="science-panel-quarantined" className="mc-panel rounded-[14px] p-4 text-xs text-muted">
+            Fault quarantined — waiting for replay response
           </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {/* Panel 1: Truth */}
-          <div data-testid="science-panel-truth" className="h-full">
-            <GlassPanel tone="emerald" className="h-full">
-              <div className="space-y-3.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-300">
-                      01 · Reference Body
-                    </span>
-                    <h3 className="text-base font-bold text-emerald-200">Truth</h3>
-                  </div>
-                  <span className="text-[11px] font-mono text-emerald-100 px-2.5 py-0.5 rounded-full bg-emerald-400/15 border border-emerald-300/35 tabular-nums">
-                    {`a=${trustedRes.truth.a.toFixed(0)}m, b=${trustedRes.truth.b.toFixed(0)}m`}
-                  </span>
-                </div>
-
-                <OccultationSvg
-                  title="Ground truth asteroid ellipse and reference station chords"
-                  truth={trustedRes.truth}
-                  fitted={null}
-                  stations={trustedRes.stations}
-                  fittedColor="#34D399"
-                  showTrueChordsOnly
-                />
-
-                <div className="p-3 rounded-xl bg-black/30 border border-emerald-300/25 space-y-1">
-                  <div className="font-mono text-sm text-emerald-200 font-bold tabular-nums">
-                    Size error 0.0% (reference body)
-                  </div>
-                  <p className="text-[11px] text-slate-300">
-                    True occultation profile with 6 stations at{' '}
-                    {trustedRes.params.shadow_speed_kms} km/s shadow speed.
-                  </p>
-                </div>
+          <div
+            data-testid="science-panel-truth"
+            className="mc-panel border-t-2 border-t-trust-trusted/75 rounded-[14px] p-5 space-y-3.5"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <span className="font-mono text-[11px] text-trust-trusted block">
+                  01 · Reference Body
+                </span>
+                <h3 className="text-base font-semibold text-foreground">Truth</h3>
               </div>
-            </GlassPanel>
+              <span className="text-[11px] font-mono text-muted tabular-nums">
+                {`a=${trustedRes.truth.a.toFixed(0)}m, b=${trustedRes.truth.b.toFixed(0)}m`}
+              </span>
+            </div>
+
+            <OccultationSvg
+              title="Ground truth asteroid ellipse and reference station chords"
+              truth={trustedRes.truth}
+              fitted={null}
+              stations={trustedRes.stations}
+              fittedColor="#3DDC97"
+              showTrueChordsOnly
+            />
+
+            <div className="pt-1 space-y-1">
+              <div className="font-mono text-sm text-trust-trusted font-semibold tabular-nums">
+                Size error 0.0% (reference body)
+              </div>
+              <p className="text-[11px] text-muted">
+                True occultation profile with 6 stations at {trustedRes.params.shadow_speed_kms}{' '}
+                km/s shadow speed.
+              </p>
+            </div>
           </div>
 
           {/* Panel 2: Fault trusted */}
-          <div data-testid="science-panel-trusted" className="h-full">
-            <GlassPanel tone="coral" className="h-full">
-              <div className="space-y-3.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-rose-300">
-                      02 · Unverified
-                    </span>
-                    <h3 className="text-base font-bold text-rose-200">Fault trusted</h3>
-                  </div>
-                  <span className="text-[11px] font-mono text-rose-100 px-2.5 py-0.5 rounded-full bg-rose-500/18 border border-rose-300/35 tabular-nums">
-                    {`a=${trustedRes.fitted.a.toFixed(1)}m, b=${trustedRes.fitted.b.toFixed(1)}m`}
-                  </span>
-                </div>
-
-                <OccultationSvg
-                  title={`Fault trusted fit: mean size error ${trustedRes.mean_size_error_pct.toFixed(1)} percent`}
-                  truth={trustedRes.truth}
-                  fitted={trustedRes.fitted}
-                  stations={trustedRes.stations}
-                  fittedColor="#FB7185"
-                />
-
-                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-300/35 space-y-1">
-                  <div className="font-mono text-sm text-rose-200 font-bold tabular-nums">
-                    {`Size error ${trustedRes.mean_size_error_pct.toFixed(1)}% (mean over ${trustedRes.trials} trials)`}
-                  </div>
-                  <p className="text-[11px] font-mono text-slate-200/85 tabular-nums">
-                    {`First trial: ${trustedRes.size_error_pct.toFixed(1)}% · Faulty station included`}
-                  </p>
-                </div>
+          <div
+            data-testid="science-panel-trusted"
+            className="mc-panel border-rose-400/20 border-t-2 border-t-trust-quarantined/75 rounded-[14px] p-5 space-y-3.5"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <span className="font-mono text-[11px] text-trust-quarantined block">
+                  02 · Unverified
+                </span>
+                <h3 className="text-base font-semibold text-foreground">Fault trusted</h3>
               </div>
-            </GlassPanel>
+              <span className="text-[11px] font-mono text-muted tabular-nums">
+                {`a=${trustedRes.fitted.a.toFixed(1)}m, b=${trustedRes.fitted.b.toFixed(1)}m`}
+              </span>
+            </div>
+
+            <OccultationSvg
+              title={`Fault trusted fit: mean size error ${trustedRes.mean_size_error_pct.toFixed(1)} percent`}
+              truth={trustedRes.truth}
+              fitted={trustedRes.fitted}
+              stations={trustedRes.stations}
+              fittedColor="#FF5C5C"
+            />
+
+            <div className="pt-1 space-y-1">
+              <div className="font-mono text-sm text-trust-quarantined font-semibold tabular-nums">
+                {`Size error ${trustedRes.mean_size_error_pct.toFixed(1)}% (mean over ${trustedRes.trials} trials)`}
+              </div>
+              <p className="text-[11px] font-mono text-muted tabular-nums">
+                {`First trial: ${trustedRes.size_error_pct.toFixed(1)}% · Faulty station included`}
+              </p>
+            </div>
           </div>
 
           {/* Panel 3: Fault quarantined */}
-          <div data-testid="science-panel-quarantined" className="h-full">
-            <GlassPanel tone="cyan" className="h-full">
-              <div className="space-y-3.5">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-cyan-300">
-                      03 · Chronyx Verified
-                    </span>
-                    <h3 className="text-base font-bold text-cyan-200">Fault quarantined</h3>
-                  </div>
-                  <span className="text-[11px] font-mono text-cyan-100 px-2.5 py-0.5 rounded-full bg-cyan-400/15 border border-cyan-300/35 tabular-nums">
-                    {`a=${quarantinedRes.fitted.a.toFixed(1)}m, b=${quarantinedRes.fitted.b.toFixed(1)}m`}
-                  </span>
-                </div>
-
-                <OccultationSvg
-                  title={`Fault quarantined fit: mean size error ${quarantinedRes.mean_size_error_pct.toFixed(1)} percent`}
-                  truth={quarantinedRes.truth}
-                  fitted={quarantinedRes.fitted}
-                  stations={quarantinedRes.stations}
-                  fittedColor="#3DD6F5"
-                />
-
-                <div className="p-3 rounded-xl bg-cyan-400/15 border border-cyan-300/35 space-y-1">
-                  <div className="font-mono text-sm text-cyan-100 font-bold tabular-nums">
-                    {`Size error ${quarantinedRes.mean_size_error_pct.toFixed(1)}% (mean over ${quarantinedRes.trials} trials)`}
-                  </div>
-                  <p className="text-[11px] font-mono text-slate-200/85 tabular-nums">
-                    {`First trial: ${quarantinedRes.size_error_pct.toFixed(1)}% · Faulty station dropped`}
-                  </p>
-                </div>
+          <div
+            data-testid="science-panel-quarantined"
+            className="mc-panel-primary mc-ticks border-t-2 border-t-accent-cyan/75 rounded-[14px] p-5 space-y-3.5"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <span className="font-mono text-[11px] text-accent-cyan block">
+                  03 · Chronyx Verified
+                </span>
+                <h3 className="text-base font-semibold text-foreground">Fault quarantined</h3>
               </div>
-            </GlassPanel>
+              <span className="text-[11px] font-mono text-muted tabular-nums">
+                {`a=${quarantinedRes.fitted.a.toFixed(1)}m, b=${quarantinedRes.fitted.b.toFixed(1)}m`}
+              </span>
+            </div>
+
+            <OccultationSvg
+              title={`Fault quarantined fit: mean size error ${quarantinedRes.mean_size_error_pct.toFixed(1)} percent`}
+              truth={quarantinedRes.truth}
+              fitted={quarantinedRes.fitted}
+              stations={quarantinedRes.stations}
+              fittedColor="#3DD6F5"
+            />
+
+            <div className="pt-1 space-y-1">
+              <div className="font-mono text-sm text-accent-cyan font-semibold tabular-nums">
+                {`Size error ${quarantinedRes.mean_size_error_pct.toFixed(1)}% (mean over ${quarantinedRes.trials} trials)`}
+              </div>
+              <p className="text-[11px] font-mono text-muted tabular-nums">
+                {`First trial: ${quarantinedRes.size_error_pct.toFixed(1)}% · Faulty station dropped`}
+              </p>
+            </div>
           </div>
         </div>
       )}
-    </LiquidGlassShell>
+    </div>
   );
 }

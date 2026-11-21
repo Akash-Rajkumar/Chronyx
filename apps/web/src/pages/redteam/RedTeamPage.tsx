@@ -18,7 +18,6 @@ import { EmptyState } from '../../ui/EmptyState.js';
 import { InfoTip } from '../../ui/InfoTip.js';
 import { Skeleton } from '../../ui/Skeleton.js';
 import { StateChip } from '../../ui/StateChip.js';
-import { GlassPanel, LiquidGlassShell } from '../../present/LiquidGlass.js';
 
 interface FaultTypeOption {
   type: FaultType;
@@ -343,527 +342,476 @@ export function RedTeamPage() {
   }
 
   return (
-    <LiquidGlassShell accent="coral" speed={1.15} dimmed={isReconnecting}>
-      {/* Liquid-Glass Header */}
-      <GlassPanel tone="default" padding="p-4 sm:p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-rose-300/90">
-                Controlled Fault Injection Console
+    <div
+      className={`space-y-5 transition-opacity duration-[180ms] ease-out ${
+        isReconnecting ? 'opacity-70' : 'opacity-100'
+      }`}
+    >
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h2 className="text-2xl font-semibold tracking-tight text-foreground">
+              Red-Team Console
+            </h2>
+            {isMock ? (
+              <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-[6px] bg-amber-500/12 border border-amber-400/30 text-amber-200">
+                SIMULATED (MOCK)
               </span>
-              {isMock ? (
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-full bg-cyan-400/15 border border-cyan-300/45 text-cyan-200 shadow-[0_0_14px_rgba(61,214,245,0.22)]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-cyan-300" aria-hidden="true" />
-                  SIMULATED (MOCK)
-                </span>
-              ) : isReconnecting ? (
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-full bg-amber-400/15 border border-amber-300/45 text-amber-200">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-300" aria-hidden="true" />
-                  RECONNECTING
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-full bg-emerald-400/15 border border-emerald-300/45 text-emerald-200">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" aria-hidden="true" />
-                  LIVE CLUSTER
-                </span>
-              )}
-            </div>
-            <h2 className="text-2xl font-bold tracking-tight text-white">Red-Team Console</h2>
-            <p className="text-sm text-slate-300">
-              Inject controlled software faults to verify detection and quarantine latency
-            </p>
+            ) : isReconnecting ? (
+              <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-[6px] bg-amber-500/12 border border-amber-400/30 text-trust-suspect">
+                RECONNECTING
+              </span>
+            ) : (
+              <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-[6px] bg-emerald-500/12 border border-emerald-400/30 text-trust-trusted">
+                LIVE CLUSTER
+              </span>
+            )}
           </div>
+          <p className="text-sm text-muted">
+            Inject controlled software faults to verify detection and quarantine latency
+          </p>
+        </div>
 
+        <div className="mc-well px-3 py-1.5 rounded-[8px] font-mono text-xs tabular-nums flex items-center gap-2 shrink-0">
           <span
-            className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full font-mono text-xs border tabular-nums shrink-0 ${
-              activeFaults.length > 0
-                ? 'bg-rose-500/20 border-rose-300/45 text-rose-100 shadow-[0_0_18px_rgba(244,63,94,0.28)]'
-                : 'bg-white/[0.06] border-white/15 text-slate-200'
+            className={`h-2 w-2 rounded-full ${
+              activeFaults.length > 0 ? 'bg-trust-quarantined' : 'bg-muted/50'
             }`}
-          >
-            <span
-              className={`h-2 w-2 rounded-full ${
-                activeFaults.length > 0 ? 'bg-rose-400' : 'bg-slate-400'
-              }`}
-              aria-hidden="true"
-            />
-            {`${activeFaults.length} active ${activeFaults.length === 1 ? 'fault' : 'faults'}`}
-          </span>
-        </div>
-      </GlassPanel>
-
-      {/* Amber Liquid-Glass Safety Banner */}
-      <GlassPanel tone="amber" padding="px-4 py-3">
-        <div role="status" className="flex items-center gap-3 text-xs text-amber-100 font-semibold">
-          <span
-            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-amber-400/25 border border-amber-300/50 text-amber-200 font-mono font-bold text-xs shrink-0"
             aria-hidden="true"
-          >
-            !
+          />
+          <span className="text-foreground">
+            {activeFaults.length} active {activeFaults.length === 1 ? 'fault' : 'faults'}
           </span>
-          <span>Software-only simulation. No signals are transmitted.</span>
         </div>
-      </GlassPanel>
+      </div>
+
+      {/* Software-Only Safety Banner */}
+      <div
+        role="status"
+        className="mc-well border-amber-400/30 border-l-2 border-l-trust-suspect px-4 py-3 rounded-[10px] flex items-center gap-3 text-xs text-amber-100 font-medium"
+      >
+        <span
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-amber-400/20 text-trust-suspect font-mono font-bold text-[11px] shrink-0"
+          aria-hidden="true"
+        >
+          !
+        </span>
+        <span>Software-only simulation. No signals are transmitted.</span>
+      </div>
 
       {nodes.length === 0 ? (
-        <GlassPanel tone="default">
-          <EmptyState
-            title="No observatory nodes online"
-            description="Connect a browser node or start virtual nodes on the server before injecting a fault."
-            action={
-              <Link
-                to="/join"
-                className="inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-xl bg-cyan-400/20 text-cyan-100 border border-cyan-300/45 hover:bg-cyan-400/30 transition-colors"
-              >
-                Join as a node
-              </Link>
-            }
-          />
-        </GlassPanel>
+        <EmptyState
+          title="No observatory nodes online"
+          description="Connect a browser node or start virtual nodes on the server before injecting a fault."
+          action={
+            <Link
+              to="/join"
+              className="inline-flex items-center px-3.5 py-2 text-xs font-semibold rounded-[10px] bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/35 hover:bg-accent-cyan/22"
+            >
+              Join as a node
+            </Link>
+          }
+        />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-          {/* Left (7 cols): Glass Injection Configuration Deck */}
-          <div className="lg:col-span-7 space-y-5">
+          {/* Left (7 cols): Single Structured Fault-Injection Deck */}
+          <div className="lg:col-span-7 mc-panel-primary mc-ticks rounded-[14px] p-5 space-y-6">
             {/* Step 1: Target Node */}
-            <GlassPanel tone="default">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <span className="font-mono text-[11px] px-2 py-0.5 rounded-md bg-cyan-400/15 text-cyan-200 border border-cyan-300/35">
-                      01
-                    </span>
-                    <span>Target Node</span>
-                  </h3>
-                  <span className="font-mono text-[11px] text-slate-300 tabular-nums">
-                    {`${sortedNodes.length} available`}
+            <section className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                  <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30">
+                    01
                   </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {sortedNodes.map((node) => {
-                    const isSelected = selectedNode?.id === node.id;
-                    const assessment = assessments[node.id];
-                    return (
-                      <button
-                        key={node.id}
-                        type="button"
-                        aria-pressed={isSelected}
-                        onClick={() => setSelectedNodeId(node.id)}
-                        className={`text-left p-3 rounded-xl border backdrop-blur-md transition-all hover:-translate-y-[1px] focus:outline-none focus:ring-2 focus:ring-cyan-300/60 ${
-                          isSelected
-                            ? 'bg-cyan-400/15 border-cyan-300/60 text-white shadow-[0_0_24px_rgba(61,214,245,0.22),inset_0_1px_0_rgba(255,255,255,0.25)]'
-                            : 'bg-white/[0.045] border-white/12 text-slate-300 hover:bg-white/[0.08] hover:border-white/25'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span
-                              className={`h-2 w-2 rounded-full shrink-0 ${
-                                isSelected
-                                  ? 'bg-cyan-300 shadow-[0_0_10px_rgba(61,214,245,0.9)]'
-                                  : 'bg-white/25'
-                              }`}
-                              aria-hidden="true"
-                            />
-                            <span className="text-xs font-semibold text-white truncate">
-                              {node.name}
-                            </span>
-                          </div>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-black/30 border border-white/15 text-slate-200 shrink-0">
-                            {node.kind === 'virtual' ? 'Simulated' : 'Real'}
-                          </span>
-                        </div>
-                        <div className="mt-2.5 flex items-center justify-between">
-                          {assessment ? (
-                            <StateChip state={assessment.state} size="sm" />
-                          ) : (
-                            <span className="text-[11px] font-mono text-slate-300/80">
-                              Unassessed
-                            </span>
-                          )}
-                          <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-slate-300">
-                            <span
-                              className={`h-1.5 w-1.5 rounded-full ${
-                                node.online ? 'bg-emerald-400' : 'bg-slate-500'
-                              }`}
-                              aria-hidden="true"
-                            />
-                            {node.online ? 'Online' : 'Offline'}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                  <span>Target Node</span>
+                </h3>
+                <span className="font-mono text-[11px] text-muted tabular-nums">
+                  {sortedNodes.length} available
+                </span>
               </div>
-            </GlassPanel>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {sortedNodes.map((node) => {
+                  const isSelected = selectedNode?.id === node.id;
+                  const assessment = assessments[node.id];
+                  return (
+                    <button
+                      key={node.id}
+                      type="button"
+                      aria-pressed={isSelected}
+                      onClick={() => setSelectedNodeId(node.id)}
+                      className={`text-left p-3 rounded-[10px] border transition-[background-color,border-color] duration-[160ms] ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 ${
+                        isSelected
+                          ? 'bg-accent-cyan/[0.12] border-accent-cyan/65 text-foreground'
+                          : 'bg-black/30 border-white/[0.1] text-muted hover:border-white/[0.22] hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-foreground truncate">
+                          {node.name}
+                        </span>
+                        <span className="text-[10px] font-mono text-muted shrink-0">
+                          {node.kind === 'virtual' ? 'Simulated' : 'Real'}
+                        </span>
+                      </div>
+                      <div className="mt-2 flex items-center justify-between">
+                        {assessment ? (
+                          <StateChip state={assessment.state} size="sm" />
+                        ) : (
+                          <span className="text-[11px] font-mono text-muted">Unassessed</span>
+                        )}
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-mono text-muted">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              node.online ? 'bg-trust-trusted' : 'bg-muted/50'
+                            }`}
+                            aria-hidden="true"
+                          />
+                          {node.online ? 'Online' : 'Offline'}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
 
             {/* Step 2: Fault Type */}
-            <GlassPanel tone="default">
-              <div className="space-y-3">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <span className="font-mono text-[11px] px-2 py-0.5 rounded-md bg-cyan-400/15 text-cyan-200 border border-cyan-300/35">
-                    02
-                  </span>
-                  <span>Fault Type</span>
-                  <InfoTip text="Browser nodes only support software agent-shim faults (clock_step, clock_ramp, noise_burst). Virtual nodes support all five." />
-                </h3>
+            <section className="space-y-2.5 pt-5 border-t border-white/[0.08]">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30">
+                  02
+                </span>
+                <span>Fault Type</span>
+                <InfoTip text="Browser nodes only support software agent-shim faults (clock_step, clock_ramp, noise_burst). Virtual nodes support all five." />
+              </h3>
 
-                <div className="space-y-2">
-                  {FAULT_TYPE_OPTIONS.map((opt) => {
-                    const allowed = isFaultAllowedForNode(opt.type, selectedNode);
-                    const isSelected = selectedType === opt.type;
-                    const disabledReason =
-                      'Virtual nodes only: browser nodes do not simulate GNSS or camera-trigger streams.';
-                    return (
-                      <button
-                        key={opt.type}
-                        type="button"
-                        disabled={!allowed}
-                        aria-pressed={isSelected}
-                        title={!allowed ? disabledReason : opt.description}
-                        onClick={() => setSelectedType(opt.type)}
-                        className={`w-full text-left px-3.5 py-3 rounded-xl border text-xs backdrop-blur-md transition-all focus:outline-none focus:ring-2 focus:ring-cyan-300/60 ${
-                          !allowed
-                            ? 'opacity-50 cursor-not-allowed bg-black/25 border-white/8 text-slate-400'
-                            : isSelected
-                              ? 'bg-cyan-400/15 border-cyan-300/60 text-white shadow-[0_0_24px_rgba(61,214,245,0.2),inset_0_1px_0_rgba(255,255,255,0.22)]'
-                              : 'bg-white/[0.045] border-white/12 text-slate-300 hover:bg-white/[0.08] hover:border-white/25'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`h-2.5 w-2.5 rounded-full border ${
-                                isSelected
-                                  ? 'border-cyan-200 bg-cyan-300 shadow-[0_0_10px_rgba(61,214,245,0.85)]'
-                                  : 'border-white/35 bg-transparent'
-                              }`}
-                              aria-hidden="true"
-                            />
-                            <span className="font-semibold text-white">{opt.label}</span>
-                            {!allowed && (
-                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-400/15 border border-amber-300/35 text-amber-200">
-                                Virtual only
-                              </span>
-                            )}
-                          </div>
-                          <span className="font-mono text-[10px] text-slate-200 px-2 py-0.5 rounded-md bg-black/30 border border-white/12">
-                            {opt.type}
-                          </span>
+              <div className="space-y-2">
+                {FAULT_TYPE_OPTIONS.map((opt) => {
+                  const allowed = isFaultAllowedForNode(opt.type, selectedNode);
+                  const isSelected = selectedType === opt.type;
+                  const disabledReason =
+                    'Virtual nodes only: browser nodes do not simulate GNSS or camera-trigger streams.';
+                  return (
+                    <button
+                      key={opt.type}
+                      type="button"
+                      disabled={!allowed}
+                      aria-pressed={isSelected}
+                      title={!allowed ? disabledReason : opt.description}
+                      onClick={() => setSelectedType(opt.type)}
+                      className={`w-full text-left px-3.5 py-2.5 rounded-[10px] border text-xs transition-[background-color,border-color] duration-[160ms] ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 ${
+                        !allowed
+                          ? 'opacity-45 cursor-not-allowed bg-black/25 border-white/[0.06] text-muted'
+                          : isSelected
+                            ? 'bg-accent-cyan/[0.12] border-accent-cyan/65 text-foreground'
+                            : 'bg-black/30 border-white/[0.1] text-muted hover:border-white/[0.22] hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`h-2 w-2 rounded-full ${
+                              isSelected ? 'bg-accent-cyan' : 'bg-white/20'
+                            }`}
+                            aria-hidden="true"
+                          />
+                          <span className="font-semibold text-foreground">{opt.label}</span>
+                          {!allowed && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/12 border border-amber-400/30 text-amber-200">
+                              Virtual only
+                            </span>
+                          )}
                         </div>
-                        <p className="text-[11px] text-slate-300/85 mt-1 pl-4">
-                          {allowed ? opt.description : disabledReason}
-                        </p>
-                      </button>
-                    );
-                  })}
-                </div>
+                        <span className="font-mono text-[10px] text-muted">{opt.type}</span>
+                      </div>
+                      <p className="text-[11px] text-muted mt-1 pl-4">
+                        {allowed ? opt.description : disabledReason}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
-            </GlassPanel>
+            </section>
 
-            {/* Step 3: Presets, Parameters & Armed Start Action */}
-            <GlassPanel tone="violet">
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                  <span className="font-mono text-[11px] px-2 py-0.5 rounded-md bg-violet-400/20 text-violet-200 border border-violet-300/40">
-                    03
-                  </span>
-                  <span>Presets &amp; Parameters</span>
-                </h3>
+            {/* Step 3: Contract Presets & Parameters */}
+            <section className="space-y-4 pt-5 border-t border-white/[0.08]">
+              <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
+                <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30">
+                  03
+                </span>
+                <span>Presets &amp; Parameters</span>
+              </h3>
 
-                {/* Contract Presets */}
-                <div className="space-y-2">
-                  <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-violet-200/80">
-                    Presets (from contract)
-                  </div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {FAULT_PRESETS.map((preset) => {
-                      const allowed = isFaultAllowedForNode(preset.type, selectedNode);
-                      return (
-                        <button
-                          key={preset.id}
-                          type="button"
-                          disabled={!allowed}
-                          title={!allowed ? 'Not supported on browser nodes' : undefined}
-                          onClick={() => applyPreset(preset)}
-                          className={`px-3 py-1.5 rounded-full text-[11px] border transition-all focus:outline-none focus:ring-2 focus:ring-violet-300/60 ${
-                            !allowed
-                              ? 'opacity-40 cursor-not-allowed border-white/10 text-slate-400 bg-black/20'
-                              : 'bg-white/[0.06] border-white/18 text-slate-100 hover:bg-violet-400/20 hover:border-violet-300/50 hover:-translate-y-[1px]'
-                          }`}
-                        >
-                          {preset.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+              <div className="flex flex-wrap gap-1.5">
+                {FAULT_PRESETS.map((preset) => {
+                  const allowed = isFaultAllowedForNode(preset.type, selectedNode);
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      disabled={!allowed}
+                      title={!allowed ? 'Not supported on browser nodes' : undefined}
+                      onClick={() => applyPreset(preset)}
+                      className={`px-2.5 py-1.5 rounded-[8px] text-[11px] border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 ${
+                        !allowed
+                          ? 'opacity-40 cursor-not-allowed border-white/[0.06] text-muted bg-black/20'
+                          : 'bg-white/[0.05] border-white/[0.12] text-foreground hover:border-accent-cyan/50 hover:bg-accent-cyan/10'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
 
-                {/* Parameter Sliders in Frosted Well */}
-                <div className="p-4 rounded-xl bg-black/30 border border-white/12 space-y-4">
-                  {(selectedType === 'clock_step' || selectedType === 'camera_delay') && (
-                    <label className="block space-y-1.5 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-200">Offset (ms)</span>
-                        <span className="font-mono text-cyan-200 font-semibold px-2 py-0.5 rounded-md bg-cyan-400/15 border border-cyan-300/35 tabular-nums">
-                          {`${offsetMs} ms`}
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={-50}
-                        max={50}
-                        step={0.5}
-                        value={offsetMs}
-                        onChange={(e) => setOffsetMs(Number(e.target.value))}
-                        className="w-full accent-cyan-400"
-                      />
-                    </label>
-                  )}
-
-                  {(selectedType === 'clock_ramp' || selectedType === 'gnss_spoof') && (
-                    <>
-                      <label className="block space-y-1.5 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-200">Drift rate (ms/min)</span>
-                          <span className="font-mono text-cyan-200 font-semibold px-2 py-0.5 rounded-md bg-cyan-400/15 border border-cyan-300/35 tabular-nums">
-                            {`${rateMsPerMin} ms/min`}
-                          </span>
-                        </div>
-                        <input
-                          type="range"
-                          min={-20}
-                          max={20}
-                          step={0.1}
-                          value={rateMsPerMin}
-                          onChange={(e) => setRateMsPerMin(Number(e.target.value))}
-                          className="w-full accent-cyan-400"
-                        />
-                      </label>
-                      <label className="block space-y-1.5 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-slate-200">Acceleration (ms/min²)</span>
-                          <span className="font-mono text-cyan-200 font-semibold px-2 py-0.5 rounded-md bg-cyan-400/15 border border-cyan-300/35 tabular-nums">
-                            {`${accelMsPerMin2} ms/min²`}
-                          </span>
-                        </div>
-                        <input
-                          type="range"
-                          min={0}
-                          max={5}
-                          step={0.05}
-                          value={accelMsPerMin2}
-                          onChange={(e) => setAccelMsPerMin2(Number(e.target.value))}
-                          className="w-full accent-cyan-400"
-                        />
-                      </label>
-                    </>
-                  )}
-
-                  {selectedType === 'noise_burst' && (
-                    <label className="block space-y-1.5 text-xs">
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-200">Noise sigma (ms)</span>
-                        <span className="font-mono text-cyan-200 font-semibold px-2 py-0.5 rounded-md bg-cyan-400/15 border border-cyan-300/35 tabular-nums">
-                          {`${noiseSigmaMs} ms`}
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={0.5}
-                        max={20}
-                        step={0.5}
-                        value={noiseSigmaMs}
-                        onChange={(e) => setNoiseSigmaMs(Number(e.target.value))}
-                        className="w-full accent-cyan-400"
-                      />
-                    </label>
-                  )}
-
+              <div className="mc-well rounded-[10px] p-4 space-y-4">
+                {(selectedType === 'clock_step' || selectedType === 'camera_delay') && (
                   <label className="block space-y-1.5 text-xs">
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-200">Duration (s, 0 = until stopped)</span>
-                      <span className="font-mono text-violet-200 font-semibold px-2 py-0.5 rounded-md bg-violet-400/15 border border-violet-300/35 tabular-nums">
-                        {durationS > 0 ? `${durationS} s` : 'Until stopped'}
+                      <span className="text-muted">Offset (ms)</span>
+                      <span className="font-mono text-foreground font-semibold tabular-nums">
+                        {offsetMs} ms
                       </span>
                     </div>
                     <input
                       type="range"
-                      min={0}
-                      max={300}
-                      step={10}
-                      value={durationS}
-                      onChange={(e) => setDurationS(Number(e.target.value))}
-                      className="w-full accent-violet-400"
+                      min={-50}
+                      max={50}
+                      step={0.5}
+                      value={offsetMs}
+                      onChange={(e) => setOffsetMs(Number(e.target.value))}
+                      className="w-full accent-accent-cyan"
                     />
                   </label>
-                </div>
-
-                {actionError && (
-                  <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-300/40 text-xs text-rose-200">
-                    {actionError}
-                  </div>
                 )}
 
-                {/* Intentional Coral-Glass Start Fault Footer */}
-                <div className="pt-3 border-t border-white/12 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="text-xs">
-                    <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-slate-300 block">
-                      Armed Simulation Target
-                    </span>
-                    <span className="font-mono text-white font-semibold">
-                      {`${selectedNode?.name ?? '--'} · ${selectedType}`}
+                {(selectedType === 'clock_ramp' || selectedType === 'gnss_spoof') && (
+                  <>
+                    <label className="block space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted">Drift rate (ms/min)</span>
+                        <span className="font-mono text-foreground font-semibold tabular-nums">
+                          {rateMsPerMin} ms/min
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-20}
+                        max={20}
+                        step={0.1}
+                        value={rateMsPerMin}
+                        onChange={(e) => setRateMsPerMin(Number(e.target.value))}
+                        className="w-full accent-accent-cyan"
+                      />
+                    </label>
+                    <label className="block space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted">Acceleration (ms/min²)</span>
+                        <span className="font-mono text-foreground font-semibold tabular-nums">
+                          {accelMsPerMin2} ms/min²
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={5}
+                        step={0.05}
+                        value={accelMsPerMin2}
+                        onChange={(e) => setAccelMsPerMin2(Number(e.target.value))}
+                        className="w-full accent-accent-cyan"
+                      />
+                    </label>
+                  </>
+                )}
+
+                {selectedType === 'noise_burst' && (
+                  <label className="block space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted">Noise sigma (ms)</span>
+                      <span className="font-mono text-foreground font-semibold tabular-nums">
+                        {noiseSigmaMs} ms
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={20}
+                      step={0.5}
+                      value={noiseSigmaMs}
+                      onChange={(e) => setNoiseSigmaMs(Number(e.target.value))}
+                      className="w-full accent-accent-cyan"
+                    />
+                  </label>
+                )}
+
+                <label className="block space-y-1.5 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted">Duration (s, 0 = until stopped)</span>
+                    <span className="font-mono text-foreground font-semibold tabular-nums">
+                      {durationS > 0 ? `${durationS} s` : 'Until stopped'}
                     </span>
                   </div>
-                  <Button
-                    data-testid="redteam-start"
-                    variant="danger"
-                    loading={starting}
-                    disabled={!selectedNode || starting}
-                    onClick={() => void handleStartFault()}
-                    className="px-5 py-2.5 font-semibold bg-rose-500/25 text-rose-100 border-rose-300/55 hover:bg-rose-500/35 hover:-translate-y-[1px] shadow-[0_0_24px_rgba(244,63,94,0.28)]"
-                  >
-                    Start Fault
-                  </Button>
-                </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={300}
+                    step={10}
+                    value={durationS}
+                    onChange={(e) => setDurationS(Number(e.target.value))}
+                    className="w-full accent-accent-cyan"
+                  />
+                </label>
               </div>
-            </GlassPanel>
+            </section>
+
+            {actionError && (
+              <div className="mc-well border-rose-400/35 border-l-2 border-l-trust-quarantined rounded-[10px] p-3 text-xs text-rose-100">
+                {actionError}
+              </div>
+            )}
+
+            <div className="pt-4 border-t border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="text-xs">
+                <span className="text-muted block">Armed Simulation Target</span>
+                <span className="font-mono text-foreground font-medium">
+                  {selectedNode?.name ?? '--'} · {selectedType}
+                </span>
+              </div>
+              <Button
+                data-testid="redteam-start"
+                variant="danger"
+                loading={starting}
+                disabled={!selectedNode || starting}
+                onClick={() => void handleStartFault()}
+                className="px-5 py-2.5 font-semibold"
+              >
+                Start Fault
+              </Button>
+            </div>
           </div>
 
-          {/* Right (5 cols): Active Faults Coral-Glass Panel */}
-          <div data-testid="redteam-active-faults" className="lg:col-span-5">
-            <GlassPanel tone="coral">
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3 pb-3 border-b border-white/12">
-                  <div>
-                    <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-rose-300">
-                      Live Fault Telemetry
-                    </span>
-                    <h3 className="text-base font-bold text-white">Active Faults</h3>
-                    <p className="text-xs text-slate-300/85">
-                      Server-tracked faults with ground truth and detection latency
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => void loadActiveFaults()}
-                    className="text-slate-200 hover:bg-white/10"
-                  >
-                    Refresh
-                  </Button>
-                </div>
+          {/* Right (5 cols): Active Faults Telemetry Panel */}
+          <div
+            data-testid="redteam-active-faults"
+            className="lg:col-span-5 mc-panel border-rose-400/20 border-t-2 border-t-trust-quarantined/75 rounded-[14px] p-5 space-y-4"
+          >
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-white/[0.08]">
+              <div>
+                <span className="text-[11px] font-mono text-trust-quarantined block">
+                  Live Fault Telemetry
+                </span>
+                <h3 className="text-base font-semibold text-foreground mt-0.5">Active Faults</h3>
+                <p className="text-xs text-muted">
+                  Server-tracked faults with ground truth and detection latency
+                </p>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => void loadActiveFaults()}>
+                Refresh
+              </Button>
+            </div>
 
-                {faultsError && (
-                  <div className="p-3 rounded-xl bg-amber-400/15 border border-amber-300/40 text-xs text-amber-100 flex items-center justify-between gap-2">
-                    <span>{faultsError}</span>
-                    <button
-                      type="button"
-                      onClick={() => void loadActiveFaults()}
-                      className="underline font-semibold"
+            {faultsError && (
+              <div className="mc-well border-amber-400/30 border-l-2 border-l-trust-suspect rounded-[10px] p-3 text-xs text-amber-100 flex items-center justify-between gap-2">
+                <span>{faultsError}</span>
+                <button
+                  type="button"
+                  onClick={() => void loadActiveFaults()}
+                  className="underline font-medium"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {activeFaults.length === 0 ? (
+              <EmptyState
+                title="No active faults"
+                description="Select a node and fault type on the left, then click Start Fault to inject a software-only test fault."
+              />
+            ) : (
+              <div className="space-y-3">
+                {activeFaults.map((fault) => {
+                  const targetNode = nodes.find((n) => n.id === fault.node_id);
+                  const isStopping = stoppingId === fault.id;
+                  return (
+                    <div
+                      key={fault.id}
+                      className="mc-well rounded-[10px] p-3.5 space-y-3 text-xs"
                     >
-                      Retry
-                    </button>
-                  </div>
-                )}
-
-                {activeFaults.length === 0 ? (
-                  <EmptyState
-                    title="No active faults"
-                    description="Select a node and fault type on the left, then click Start Fault to inject a software-only test fault."
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    {activeFaults.map((fault) => {
-                      const targetNode = nodes.find((n) => n.id === fault.node_id);
-                      const isStopping = stoppingId === fault.id;
-                      return (
-                        <div
-                          key={fault.id}
-                          className="p-3.5 rounded-xl bg-black/35 border border-white/15 backdrop-blur-md space-y-3 text-xs shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="space-y-1.5 min-w-0">
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <span className="font-bold text-sm text-white truncate">
-                                  {targetNode?.name ?? fault.node_id.slice(0, 8)}
-                                </span>
-                                <span className="font-mono text-[11px] px-2 py-0.5 rounded-md bg-cyan-400/15 border border-cyan-300/35 text-cyan-200">
-                                  {fault.type}
-                                </span>
-                                <span className="font-mono text-[10px] text-slate-300">
-                                  {`(${fault.applies_to})`}
-                                </span>
-                              </div>
-                              <div>
-                                {fault.detection_latency_s !== null ? (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full font-mono text-[11px] bg-emerald-400/15 text-emerald-200 border border-emerald-300/40 tabular-nums shadow-[0_0_14px_rgba(16,185,129,0.2)]">
-                                    {`Detected in ${fault.detection_latency_s.toFixed(1)} s`}
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full font-mono text-[11px] bg-amber-400/15 text-amber-200 border border-amber-300/40">
-                                    Awaiting detection
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              loading={isStopping}
-                              disabled={isStopping}
-                              onClick={() => void handleStopFault(fault.id)}
-                              className="shrink-0 bg-white/[0.08] border-white/20 text-white hover:bg-rose-500/25 hover:border-rose-300/50 hover:-translate-y-[1px]"
-                            >
-                              Stop
-                            </Button>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="space-y-1.5 min-w-0">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-semibold text-sm text-foreground truncate">
+                              {targetNode?.name ?? fault.node_id.slice(0, 8)}
+                            </span>
+                            <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-white/[0.06] border border-white/[0.1] text-accent-cyan">
+                              {fault.type}
+                            </span>
+                            <span className="font-mono text-[10px] text-muted">
+                              ({fault.applies_to})
+                            </span>
                           </div>
-
-                          <div className="grid grid-cols-3 gap-2 pt-2.5 border-t border-white/10 font-mono tabular-nums">
-                            <div>
-                              <span className="text-[10px] text-slate-300/80 block uppercase">
-                                Elapsed
+                          <div>
+                            {fault.detection_latency_s !== null ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-[6px] font-mono text-[11px] bg-trust-trusted/12 text-trust-trusted border border-trust-trusted/30 tabular-nums">
+                                {`Detected in ${fault.detection_latency_s.toFixed(1)} s`}
                               </span>
-                              <span className="text-white font-semibold">
-                                {formatElapsed(fault.started_at_ms, nowMs)}
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-[6px] font-mono text-[11px] bg-trust-suspect/12 text-trust-suspect border border-trust-suspect/30">
+                                Awaiting detection
                               </span>
-                            </div>
-                            <div>
-                              <span className="text-[10px] text-slate-300/80 block uppercase">
-                                Size
-                              </span>
-                              <span className="text-cyan-200 font-semibold">
-                                {formatFaultMagnitude(fault)}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-[10px] text-slate-300/80 block uppercase">
-                                At detect
-                              </span>
-                              <span className="text-white font-semibold">
-                                {fault.error_at_detect_ms !== null
-                                  ? `${fault.error_at_detect_ms.toFixed(2)} ms`
-                                  : '--'}
-                              </span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-end text-[10px] font-mono text-slate-400">
-                            {`id: ${fault.id.slice(0, 8)}`}
+                            )}
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          loading={isStopping}
+                          disabled={isStopping}
+                          onClick={() => void handleStopFault(fault.id)}
+                          className="shrink-0"
+                        >
+                          Stop
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-3 divide-x divide-white/[0.08] pt-2.5 border-t border-white/[0.07] font-mono tabular-nums">
+                        <div className="pr-2">
+                          <span className="text-[10px] text-muted block font-sans">Elapsed</span>
+                          <span className="text-foreground font-medium">
+                            {formatElapsed(fault.started_at_ms, nowMs)}
+                          </span>
+                        </div>
+                        <div className="px-2">
+                          <span className="text-[10px] text-muted block font-sans">Size</span>
+                          <span className="text-accent-cyan font-medium">
+                            {formatFaultMagnitude(fault)}
+                          </span>
+                        </div>
+                        <div className="pl-2">
+                          <span className="text-[10px] text-muted block font-sans">At detect</span>
+                          <span className="text-foreground font-medium">
+                            {fault.error_at_detect_ms !== null
+                              ? `${fault.error_at_detect_ms.toFixed(2)} ms`
+                              : '--'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-end text-[10px] font-mono text-muted/75">
+                        id: {fault.id.slice(0, 8)}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </GlassPanel>
+            )}
           </div>
         </div>
       )}
-    </LiquidGlassShell>
+    </div>
   );
 }
