@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true,
+    "lib": ["DOM", "DOM.Iterable", "ES2022"]
+  },
+  "references": [
+    { "path": "../contracts" },
+    { "path": "../crypto" }
+  ],
+  "include": ["src/**/*"]
+}

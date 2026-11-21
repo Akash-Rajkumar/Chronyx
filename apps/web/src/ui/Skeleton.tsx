@@ -15,6 +15,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 }) => {
   return (
     <div
+      data-testid="skeleton"
       className={`animate-pulse bg-muted/10 ${circle ? 'rounded-full' : 'rounded-lg'} ${className}`}
       style={{
         width: width,
