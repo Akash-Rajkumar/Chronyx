@@ -1,6 +1,19 @@
+import { createRequire } from 'module';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { ChronyxDatabase } from './schema.js';
 import { logger } from '../../logger.js';
+
+const require = createRequire(import.meta.url);
+
+// In Node.js < 22, @supabase/realtime-js requires a WebSocket implementation on globalThis
+if (typeof globalThis.WebSocket === 'undefined') {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (globalThis as any).WebSocket = require('ws');
+  } catch {
+    // fallback if ws is not resolvable
+  }
+}
 
 let cachedClient: SupabaseClient<ChronyxDatabase> | null = null;
 
