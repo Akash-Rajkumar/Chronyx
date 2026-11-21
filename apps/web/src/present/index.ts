@@ -4,3 +4,14 @@ export { usePresenterMode, usePresenterShortcuts, isEditableTarget } from './use
 export type { UsePresenterShortcutsOptions } from './usePresenterMode.js';
 export { DEMO_CUES } from './cues.js';
 export type { DemoCue } from './cues.js';
+export {
+  GlassPanel,
+  LiquidGlassShell,
+  ParallaxStarfieldBackdrop,
+} from './LiquidGlass.js';
+export type {
+  GlassPanelProps,
+  GlassTone,
+  LiquidGlassShellProps,
+  ParallaxStarfieldBackdropProps,
+} from './LiquidGlass.js';

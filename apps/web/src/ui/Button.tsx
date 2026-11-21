@@ -18,17 +18,17 @@ export const Button: React.FC<ButtonProps> = ({
   ...props
 }) => {
   const base =
-    'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 select-none focus:outline-none focus:ring-2 focus:ring-accent-cyan/50 disabled:opacity-50 disabled:cursor-not-allowed';
+    'inline-flex items-center justify-center font-medium rounded-[10px] transition-[background-color,border-color,color,transform,box-shadow] duration-[180ms] ease-out select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#060b16] disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:shadow-none';
 
   const variants = {
     primary:
-      'bg-accent-cyan text-background font-semibold hover:bg-accent-cyan/90 shadow-sm active:translate-y-[0.5px]',
+      'bg-accent-cyan text-[#050B16] font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.45),0_2px_10px_rgba(61,214,245,0.16)] hover:bg-[#5BE0F7] hover:-translate-y-[1px] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_6px_18px_rgba(61,214,245,0.24)] active:translate-y-[0.5px] active:shadow-[inset_0_1px_2px_rgba(5,11,22,0.35)]',
     secondary:
-      'bg-card text-foreground border border-border hover:bg-card/80 hover:border-accent-cyan/40',
+      'bg-white/[0.05] text-foreground border border-white/[0.13] shadow-[inset_0_1px_0_rgba(255,255,255,0.09)] hover:bg-white/[0.09] hover:border-white/[0.22] active:translate-y-[0.5px] active:shadow-none',
     danger:
-      'bg-trust-quarantined/10 text-trust-quarantined border border-trust-quarantined/30 hover:bg-trust-quarantined/20',
+      'bg-trust-quarantined/[0.12] text-trust-quarantined border border-trust-quarantined/35 hover:bg-trust-quarantined/[0.2] hover:border-trust-quarantined/55 active:translate-y-[0.5px]',
     ghost:
-      'text-muted hover:text-foreground hover:bg-card/50',
+      'text-muted hover:text-foreground hover:bg-white/[0.06] active:translate-y-[0.5px]',
   }[variant];
 
   const sizes = {

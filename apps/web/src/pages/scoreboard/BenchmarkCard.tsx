@@ -5,10 +5,10 @@ import { api } from '../../api/client.js';
 import { getDashboardSocket } from '../../api/socket.js';
 import { useConnectionStatus } from '../../state/useDashboardStore.js';
 import { Button } from '../../ui/Button.js';
-import { Card } from '../../ui/Card.js';
 import { EmptyState } from '../../ui/EmptyState.js';
 import { InfoTip } from '../../ui/InfoTip.js';
 import { Skeleton } from '../../ui/Skeleton.js';
+import { GlassPanel } from '../../present/LiquidGlass.js';
 
 interface BenchmarkProgressEvent {
   run_id: string;
@@ -88,10 +88,10 @@ export function BenchmarkCard() {
         prev.map((r) =>
           r.id === evt.run_id
             ? {
-                ...r,
-                status: evt.done >= evt.total ? r.status : 'running',
-                progress: { done: evt.done, total: evt.total },
-              }
+              ...r,
+              status: evt.done >= evt.total ? r.status : 'running',
+              progress: { done: evt.done, total: evt.total },
+            }
             : r,
         ),
       );
@@ -162,265 +162,293 @@ export function BenchmarkCard() {
 
   return (
     <div data-testid="scoreboard-benchmark">
-      <Card className="space-y-4">
-        {/* Card Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-foreground">
-                Benchmark (simulated noise)
-              </h3>
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-background border border-border text-muted">
-                Simulated noise
-              </span>
-              <InfoTip text="Runs fast-forward deterministic Monte Carlo trials against the real detection engine using simulated Gaussian noise." />
+      <GlassPanel tone={selectedRun?.status === 'done' ? 'emerald' : 'violet'}>
+        <div className="space-y-5">
+          {/* Card Header */}
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-4 border-b border-white/12">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-violet-300">
+                  Simulated Noise Harness
+                </span>
+                <span className="text-[10px] font-mono font-semibold px-2.5 py-0.5 rounded-full bg-violet-400/20 border border-violet-300/45 text-violet-100">
+                  Simulated noise
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-lg font-bold text-white">Benchmark (simulated noise)</h3>
+                <InfoTip text="Runs fast-forward deterministic Monte Carlo trials against the real detection engine using simulated Gaussian noise." />
+              </div>
+              <p className="text-xs text-slate-300/85">
+                Seeded repeatability harness (1–500 trials, fast-forward simulation) — separate from
+                live session evidence above
+              </p>
             </div>
-            <p className="text-xs text-muted">
-              Seeded repeatability harness (1–500 trials, fast-forward simulation)
-            </p>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => void fetchRuns()}
+                className="text-slate-200 hover:bg-white/10"
+              >
+                Refresh
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!selectedRun}
+                onClick={handleExportBenchmark}
+                className="bg-white/[0.08] border-white/20 text-white hover:bg-violet-400/20 hover:border-violet-300/45 hover:-translate-y-[1px]"
+              >
+                Export JSON
+              </Button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => void fetchRuns()}>
-              Refresh
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              disabled={!selectedRun}
-              onClick={handleExportBenchmark}
-            >
-              Export JSON
-            </Button>
-          </div>
-        </div>
+          {/* Compact Experiment Control Surface */}
+          <form
+            onSubmit={(e) => void handleRunBenchmark(e)}
+            className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end p-3.5 rounded-xl bg-black/35 border border-white/15 backdrop-blur-md"
+          >
+            <label className="sm:col-span-4 block space-y-1 text-xs">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-violet-200/85">
+                Scenario
+              </span>
+              <select
+                value={scenario}
+                onChange={(e) => setScenario(e.target.value as BenchScenario)}
+                className="w-full px-3 py-2 rounded-lg bg-[#0A1328]/85 border border-white/18 text-white text-xs focus:outline-none focus:ring-2 focus:ring-violet-300/60"
+              >
+                {SCENARIO_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-        {/* Compact Benchmark Form */}
-        <form
-          onSubmit={(e) => void handleRunBenchmark(e)}
-          className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end p-3 rounded-lg bg-background/50 border border-border/70"
-        >
-          <label className="block space-y-1 text-xs">
-            <span className="text-muted">Scenario</span>
-            <select
-              value={scenario}
-              onChange={(e) => setScenario(e.target.value as BenchScenario)}
-              className="w-full px-2.5 py-1.5 rounded-md bg-card border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-accent-cyan/50"
-            >
-              {SCENARIO_OPTIONS.map((opt) => (
-                <option key={opt.value} value={opt.value}>
-                  {opt.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="sm:col-span-3 block space-y-1 text-xs">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-violet-200/85">
+                Repeats (1–500)
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={500}
+                value={repeats}
+                onChange={(e) => setRepeats(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-lg bg-[#0A1328]/85 border border-white/18 text-white font-mono text-xs tabular-nums focus:outline-none focus:ring-2 focus:ring-violet-300/60"
+              />
+            </label>
 
-          <label className="block space-y-1 text-xs">
-            <span className="text-muted">Repeats (1–500)</span>
-            <input
-              type="number"
-              min={1}
-              max={500}
-              value={repeats}
-              onChange={(e) => setRepeats(Number(e.target.value))}
-              className="w-full px-2.5 py-1.5 rounded-md bg-card border border-border text-foreground font-mono text-xs tabular-nums focus:outline-none focus:ring-2 focus:ring-accent-cyan/50"
-            />
-          </label>
+            <label className="sm:col-span-2 block space-y-1 text-xs">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-violet-200/85">
+                Seed
+              </span>
+              <input
+                type="number"
+                value={seed}
+                onChange={(e) => setSeed(Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-lg bg-[#0A1328]/85 border border-white/18 text-white font-mono text-xs tabular-nums focus:outline-none focus:ring-2 focus:ring-violet-300/60"
+              />
+            </label>
 
-          <label className="block space-y-1 text-xs">
-            <span className="text-muted">Seed</span>
-            <input
-              type="number"
-              value={seed}
-              onChange={(e) => setSeed(Number(e.target.value))}
-              className="w-full px-2.5 py-1.5 rounded-md bg-card border border-border text-foreground font-mono text-xs tabular-nums focus:outline-none focus:ring-2 focus:ring-accent-cyan/50"
-            />
-          </label>
+            <div className="sm:col-span-3">
+              <Button
+                type="submit"
+                variant="primary"
+                size="sm"
+                loading={submitting}
+                disabled={submitting}
+                className="w-full py-2 hover:-translate-y-[1px] shadow-[0_0_20px_rgba(61,214,245,0.3)]"
+              >
+                Run Benchmark
+              </Button>
+            </div>
+          </form>
 
-          <div>
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-              loading={submitting}
-              disabled={submitting}
-              className="w-full"
-            >
-              Run Benchmark
-            </Button>
-          </div>
-        </form>
+          {/* Error banner */}
+          {error && (
+            <div className="p-3 rounded-xl bg-rose-500/18 border border-rose-300/40 text-xs text-rose-100 flex items-center justify-between gap-2">
+              <span>{error}</span>
+              <button
+                type="button"
+                onClick={() => void fetchRuns()}
+                className="underline font-semibold hover:text-white"
+              >
+                Retry
+              </button>
+            </div>
+          )}
 
-        {/* Error banner */}
-        {error && (
-          <div className="p-2.5 rounded-lg bg-trust-quarantined/10 border border-trust-quarantined/30 text-xs text-trust-quarantined flex items-center justify-between">
-            <span>{error}</span>
-            <button
-              type="button"
-              onClick={() => void fetchRuns()}
-              className="underline hover:opacity-80"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* Run Selector (when multiple runs exist) */}
-        {runs.length > 1 && (
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-            <span className="text-muted mr-1">Recent runs:</span>
-            {runs.slice(0, 6).map((run) => {
-              const isSelected = selectedRun?.id === run.id;
-              return (
-                <button
-                  key={run.id}
-                  type="button"
-                  onClick={() => setSelectedRunId(run.id)}
-                  className={`px-2 py-1 rounded-md font-mono border transition-colors ${
-                    isSelected
-                      ? 'bg-accent-cyan/15 border-accent-cyan text-accent-cyan'
-                      : 'bg-background/50 border-border text-muted hover:border-muted/60'
-                  }`}
-                >
-                  {`${run.scenario} (${run.repeats}x, ${run.status})`}
-                </button>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Body: Loading / Empty / Active Run Progress & Results */}
-        {loadingRuns && runs.length === 0 ? (
-          <div className="space-y-2">
-            <Skeleton height={24} />
-            <Skeleton height={96} />
-          </div>
-        ) : !selectedRun ? (
-          <EmptyState
-            title="No benchmark runs yet"
-            description="Choose a scenario, repeat count, and seed above, then click Run Benchmark to evaluate the detector under simulated noise."
-          />
-        ) : (
-          <div className="space-y-4">
-            {/* Status & Progress Bar */}
-            <div className="space-y-1.5 text-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2 font-mono">
-                  <span className="text-foreground font-semibold">{selectedRun.scenario}</span>
-                  <span className="text-muted">{`seed=${selectedRun.seed}`}</span>
-                  <span
-                    className={`px-1.5 py-0.5 rounded text-[10px] border ${
-                      selectedRun.status === 'done'
-                        ? 'bg-trust-trusted/10 text-trust-trusted border-trust-trusted/30'
-                        : selectedRun.status === 'failed'
-                          ? 'bg-trust-quarantined/10 text-trust-quarantined border-trust-quarantined/30'
-                          : 'bg-accent-cyan/10 text-accent-cyan border-accent-cyan/30'
+          {/* Run Selector (when multiple runs exist) */}
+          {runs.length > 1 && (
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+              <span className="font-mono text-[10px] uppercase tracking-wider text-slate-300 mr-1">
+                Recent runs:
+              </span>
+              {runs.slice(0, 6).map((run) => {
+                const isSelected = selectedRun?.id === run.id;
+                return (
+                  <button
+                    key={run.id}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => setSelectedRunId(run.id)}
+                    className={`px-2.5 py-1 rounded-full font-mono border transition-all focus:outline-none focus:ring-2 focus:ring-violet-300/60 ${
+                      isSelected
+                        ? 'bg-violet-400/22 border-violet-300/55 text-white shadow-[0_0_16px_rgba(139,92,246,0.25)]'
+                        : 'bg-white/[0.05] border-white/12 text-slate-300 hover:border-white/30 hover:text-white'
                     }`}
                   >
-                    {selectedRun.status}
-                  </span>
+                    {`${run.scenario} (${run.repeats}x, ${run.status})`}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Body: Loading / Empty / Active Run Progress & Experiment Report */}
+          {loadingRuns && runs.length === 0 ? (
+            <div className="space-y-2">
+              <Skeleton height={24} />
+              <Skeleton height={110} />
+            </div>
+          ) : !selectedRun ? (
+            <EmptyState
+              title="No benchmark runs yet"
+              description="Choose a scenario, repeat count, and seed above, then click Run Benchmark to evaluate the detector under simulated noise."
+            />
+          ) : (
+            <div className="p-4 rounded-xl bg-black/35 border border-white/15 backdrop-blur-md space-y-4">
+              {/* Status & Progress Bar */}
+              <div className="space-y-2 text-xs">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2 font-mono">
+                    <span className="text-white font-bold uppercase tracking-wide">
+                      {selectedRun.scenario}
+                    </span>
+                    <span className="text-violet-200/80">{`seed=${selectedRun.seed}`}</span>
+                    <span
+                      className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase border ${
+                        selectedRun.status === 'done'
+                          ? 'bg-emerald-400/18 text-emerald-200 border-emerald-300/45 shadow-[0_0_12px_rgba(16,185,129,0.22)]'
+                          : selectedRun.status === 'failed'
+                            ? 'bg-rose-500/20 text-rose-200 border-rose-300/45'
+                            : 'bg-cyan-400/18 text-cyan-200 border-cyan-300/45'
+                      }`}
+                    >
+                      {selectedRun.status}
+                    </span>
+                  </div>
+                  {activeProgress && (
+                    <span className="font-mono text-slate-200 tabular-nums">
+                      {`${activeProgress.done} / ${activeProgress.total} (${activeProgress.pct}%)`}
+                    </span>
+                  )}
                 </div>
+
                 {activeProgress && (
-                  <span className="font-mono text-muted tabular-nums">
-                    {`${activeProgress.done} / ${activeProgress.total} (${activeProgress.pct}%)`}
-                  </span>
+                  <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-150 ${
+                        selectedRun.status === 'failed'
+                          ? 'bg-gradient-to-r from-rose-500 to-fuchsia-400'
+                          : selectedRun.status === 'done'
+                            ? 'bg-gradient-to-r from-emerald-400 to-cyan-300'
+                            : 'bg-gradient-to-r from-cyan-400 to-violet-400'
+                      }`}
+                      style={{ width: `${activeProgress.pct}%` }}
+                    />
+                  </div>
                 )}
               </div>
 
-              {activeProgress && (
-                <div className="h-2 w-full rounded-full bg-border/60 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-150 ${
-                      selectedRun.status === 'failed'
-                        ? 'bg-trust-quarantined'
-                        : selectedRun.status === 'done'
-                          ? 'bg-trust-trusted'
-                          : 'bg-accent-cyan'
-                    }`}
-                    style={{ width: `${activeProgress.pct}%` }}
-                  />
+              {/* Results Grid (strictly from API BenchmarkRun.results) */}
+              {selectedRun.status === 'failed' ? (
+                <div className="p-3 rounded-xl bg-rose-500/18 border border-rose-300/40 text-xs text-rose-100">
+                  Benchmark run failed on the server. Try running again or check server logs.
+                </div>
+              ) : selectedRun.results ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-violet-200/85 pt-2 border-t border-white/10">
+                    <span>
+                      {`Noise model: ${selectedRun.results.noise_model} · Nodes: ${selectedRun.results.n_nodes} · Repeats: ${selectedRun.repeats}`}
+                    </span>
+                    <span className="text-slate-400">{`run: ${selectedRun.id.slice(0, 8)}`}</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                    <div className="p-3.5 rounded-xl bg-white/[0.045] border border-cyan-300/25 space-y-1">
+                      <div className="text-[11px] text-slate-300">Time to detect</div>
+                      <div className="font-mono text-sm font-bold text-cyan-200 tabular-nums">
+                        {formatDist(selectedRun.results.time_to_detect_s, 's')}
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-white/[0.045] border border-cyan-300/25 space-y-1">
+                      <div className="text-[11px] text-slate-300">Error at detection</div>
+                      <div className="font-mono text-sm font-bold text-cyan-100 tabular-nums">
+                        {formatDist(selectedRun.results.error_at_detect_ms, 'ms')}
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-white/[0.045] border border-white/15 space-y-1">
+                      <div className="text-[11px] text-slate-300">Detect rate vs Baseline</div>
+                      <div className="font-mono text-sm font-bold tabular-nums">
+                        <span className="text-emerald-300">
+                          {`${(selectedRun.results.detect_rate * 100).toFixed(1)}%`}
+                        </span>
+                        <span className="text-slate-400 font-normal"> vs </span>
+                        <span className="text-rose-300">
+                          {`${(selectedRun.results.baseline_detect_rate * 100).toFixed(1)}%`}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-white/[0.045] border border-violet-300/25 space-y-1">
+                      <div className="text-[11px] text-slate-300">False alarms / hour (clean)</div>
+                      <div className="font-mono text-sm font-bold text-violet-200 tabular-nums">
+                        {selectedRun.results.false_alarms_per_hour !== null
+                          ? selectedRun.results.false_alarms_per_hour.toFixed(2)
+                          : '--'}
+                      </div>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl bg-white/[0.045] border border-white/15 space-y-1 sm:col-span-2">
+                      <div className="text-[11px] text-slate-300">
+                        Science size error (without vs with Chronyx)
+                      </div>
+                      <div className="font-mono text-sm font-bold tabular-nums">
+                        {selectedRun.results.science_error_pct ? (
+                          <>
+                            <span className="text-rose-300">
+                              {`${selectedRun.results.science_error_pct.without.toFixed(1)}%`}
+                            </span>
+                            <span className="text-slate-400 font-normal"> without vs </span>
+                            <span className="text-cyan-200">
+                              {`${selectedRun.results.science_error_pct.with.toFixed(1)}%`}
+                            </span>
+                            <span className="text-slate-400 font-normal"> with Chronyx</span>
+                          </>
+                        ) : (
+                          <span className="text-slate-400">--</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-white/[0.04] border border-white/12 text-xs text-slate-300">
+                  Benchmark is queued or running. Results will appear automatically when{' '}
+                  <code className="font-mono text-cyan-200">benchmark:progress</code> completes.
                 </div>
               )}
             </div>
-
-            {/* Results Grid (strictly from API BenchmarkRun.results) */}
-            {selectedRun.status === 'failed' ? (
-              <div className="p-3 rounded-lg bg-trust-quarantined/10 border border-trust-quarantined/30 text-xs text-trust-quarantined">
-                Benchmark run failed on the server. Try running again or check server logs.
-              </div>
-            ) : selectedRun.results ? (
-              <div className="space-y-3">
-                <div className="text-[11px] font-mono text-muted">
-                  {`Noise model: ${selectedRun.results.noise_model} · Nodes: ${selectedRun.results.n_nodes} · Repeats: ${selectedRun.repeats}`}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3 rounded-lg bg-background/60 border border-border space-y-1">
-                    <div className="text-muted">Time to detect</div>
-                    <div className="font-mono font-semibold text-foreground tabular-nums">
-                      {formatDist(selectedRun.results.time_to_detect_s, 's')}
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-background/60 border border-border space-y-1">
-                    <div className="text-muted">Error at detection</div>
-                    <div className="font-mono font-semibold text-foreground tabular-nums">
-                      {formatDist(selectedRun.results.error_at_detect_ms, 'ms')}
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-background/60 border border-border space-y-1">
-                    <div className="text-muted">Detect rate vs Baseline</div>
-                    <div className="font-mono font-semibold tabular-nums">
-                      <span className="text-accent-cyan">
-                        {`${(selectedRun.results.detect_rate * 100).toFixed(1)}%`}
-                      </span>
-                      <span className="text-muted"> vs </span>
-                      <span className="text-trust-quarantined">
-                        {`${(selectedRun.results.baseline_detect_rate * 100).toFixed(1)}%`}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-background/60 border border-border space-y-1">
-                    <div className="text-muted">False alarms / hour (clean)</div>
-                    <div className="font-mono font-semibold text-foreground tabular-nums">
-                      {selectedRun.results.false_alarms_per_hour !== null
-                        ? selectedRun.results.false_alarms_per_hour.toFixed(2)
-                        : '--'}
-                    </div>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-background/60 border border-border space-y-1 sm:col-span-2">
-                    <div className="text-muted">Science size error (without vs with Chronyx)</div>
-                    <div className="font-mono font-semibold tabular-nums">
-                      {selectedRun.results.science_error_pct ? (
-                        <>
-                          <span className="text-trust-quarantined">
-                            {`${selectedRun.results.science_error_pct.without.toFixed(1)}%`}
-                          </span>
-                          <span className="text-muted"> without vs </span>
-                          <span className="text-accent-cyan">
-                            {`${selectedRun.results.science_error_pct.with.toFixed(1)}%`}
-                          </span>
-                          <span className="text-muted"> with Chronyx</span>
-                        </>
-                      ) : (
-                        <span className="text-muted">--</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="p-3 rounded-lg bg-background/40 border border-border/60 text-xs text-muted">
-                Benchmark is queued or running. Results will appear automatically when{' '}
-                <code className="font-mono">benchmark:progress</code> completes.
-              </div>
-            )}
-          </div>
-        )}
-      </Card>
+          )}
+        </div>
+      </GlassPanel>
     </div>
   );
 }

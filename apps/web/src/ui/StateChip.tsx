@@ -28,7 +28,7 @@ export const StateChip: React.FC<StateChipProps> = ({
   return (
     <span
       data-testid="state-chip"
-      className={`inline-flex items-center rounded-md font-mono border ${def.bgClass} ${def.textClass} ${def.borderClass} ${sizeClasses} ${className}`}
+      className={`inline-flex items-center rounded-[6px] font-mono border backdrop-blur-sm ${def.bgClass} ${def.textClass} ${def.borderClass} ${sizeClasses} ${className}`}
       title={`Trust state: ${def.label}`}
     >
       {showSymbol && <span className="font-bold leading-none">{def.symbol}</span>}

@@ -18,12 +18,12 @@ export const AppShell: React.FC<AppShellProps> = ({
   }, []);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
-      <Sidebar showPassport={showPassport} />
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+    <div className="chronyx-canvas relative flex h-screen w-screen overflow-hidden text-foreground">
+      <Sidebar showPassport={showPassport} className="relative z-10" />
+      <div className="relative z-10 flex-1 flex flex-col min-w-0 overflow-hidden">
         <ConnectionBanner />
-        <main className="flex-1 overflow-auto bg-background p-6">
-          {children}
+        <main className="flex-1 overflow-auto p-6">
+          <div className="mx-auto w-full max-w-[1520px]">{children}</div>
         </main>
       </div>
     </div>

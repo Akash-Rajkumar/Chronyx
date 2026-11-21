@@ -44,7 +44,7 @@ export const ConfidenceRing: React.FC<ConfidenceRingProps> = ({
             cy={size / 2}
             r={radius}
             fill="transparent"
-            stroke="#1F2B4A"
+            stroke="rgba(255, 255, 255, 0.10)"
             strokeWidth={strokeWidth}
           />
           {/* Progress Indicator */}
@@ -58,7 +58,7 @@ export const ConfidenceRing: React.FC<ConfidenceRingProps> = ({
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
-            className="transition-all duration-300 ease-out"
+            className="transition-[stroke-dashoffset,stroke] duration-200 ease-out"
           />
         </svg>
 

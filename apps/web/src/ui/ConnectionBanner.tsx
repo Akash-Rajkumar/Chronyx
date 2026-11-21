@@ -23,15 +23,15 @@ export const ConnectionBanner: React.FC<ConnectionBannerProps> = ({
       <div
         data-testid="connection-banner"
         role="status"
-        className={`w-full py-2 px-4 bg-accent-cyan/10 border-b border-accent-cyan/30 text-accent-cyan text-xs flex items-center justify-between transition-all duration-200 ${className}`}
+        className={`w-full py-2 px-6 bg-accent-cyan/[0.08] backdrop-blur-md border-b border-accent-cyan/25 text-accent-cyan text-xs flex items-center justify-between transition-colors duration-[180ms] ease-out ${className}`}
       >
         <div className="flex items-center gap-2">
-          <span className="inline-block h-2 w-2 rounded-full bg-accent-cyan" />
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent-cyan" />
           <span className="font-medium">
             Mock Mode Active: Displaying simulated telemetry from frozen contract fixtures.
           </span>
         </div>
-        <span className="font-mono text-[11px] opacity-80">VITE_USE_MOCKS=1</span>
+        <span className="font-mono text-[11px] opacity-85">VITE_USE_MOCKS=1</span>
       </div>
     );
   }
@@ -42,17 +42,21 @@ export const ConnectionBanner: React.FC<ConnectionBannerProps> = ({
     <div
       data-testid="connection-banner"
       role="status"
-      className={`w-full py-2 px-4 bg-trust-suspect/10 border-b border-trust-suspect/30 text-trust-suspect text-xs flex items-center justify-between transition-all duration-200 ${className}`}
+      className={`w-full py-2 px-6 bg-amber-500/[0.09] backdrop-blur-md border-b border-amber-400/25 text-trust-suspect text-xs flex items-center justify-between transition-colors duration-[180ms] ease-out ${className}`}
     >
       <div className="flex items-center gap-2">
-        <span className="inline-block h-2 w-2 rounded-full bg-trust-suspect animate-ping" />
+        <span
+          className={`inline-block h-1.5 w-1.5 rounded-full bg-trust-suspect ${
+            isConnecting ? 'chronyx-live-dot' : ''
+          }`}
+        />
         <span className="font-medium">
           {isConnecting
             ? 'Connecting to Chronyx telemetry stream...'
             : 'Live stream disconnected. Displaying last known verified state.'}
         </span>
       </div>
-      <span className="font-mono text-[11px] opacity-80">
+      <span className="font-mono text-[11px] opacity-85">
         {isConnecting ? 'handshake in progress' : 'reconnecting...'}
       </span>
     </div>

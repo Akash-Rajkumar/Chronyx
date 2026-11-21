@@ -31,9 +31,9 @@ export const Stat: React.FC<StatProps> = ({
   return (
     <div
       data-testid={dataTestId}
-      className={`bg-card border border-border p-4 rounded-xl space-y-1 ${className}`}
+      className={`chronyx-glass p-4 rounded-xl space-y-2 ${className}`}
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.07]">
         <span className="text-xs text-muted font-medium tracking-tight flex items-center gap-1">
           {label}
         </span>
@@ -45,7 +45,7 @@ export const Stat: React.FC<StatProps> = ({
       </div>
 
       <div className="flex items-baseline gap-1.5">
-        <span className="text-2xl font-bold tracking-tight text-foreground font-mono tabular-nums">
+        <span className="text-2xl font-semibold tracking-tight text-foreground font-mono tabular-nums">
           {value}
         </span>
         {unit && <span className="text-xs text-muted font-mono">{unit}</span>}

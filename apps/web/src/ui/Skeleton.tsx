@@ -15,7 +15,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 }) => {
   return (
     <div
-      className={`animate-pulse bg-muted/10 ${circle ? 'rounded-full' : 'rounded-lg'} ${className}`}
+      className={`motion-safe:animate-pulse bg-white/[0.06] border border-white/[0.05] ${circle ? 'rounded-full' : 'rounded-[10px]'} ${className}`}
       style={{
         width: width,
         height: height,
