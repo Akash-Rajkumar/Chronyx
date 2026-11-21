@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@chronyx/agent": "*",
     "@chronyx/contracts": "*",
     "framer-motion": "^11.5.4",
     "qrcode.react": "^4.0.1",
