@@ -40,8 +40,69 @@ export interface NodeState {
 export class NodeRegistry {
   private readonly nodesById = new Map<UUID, NodeState>();
   private readonly nodesByPublicKey = new Map<string, UUID>();
+  private readonly hydrationLocks = new Map<string, Promise<NodeInfo | null>>();
 
   constructor() {}
+
+  /**
+   * Hydrates a node record from the database and restores chain continuity
+   * from the latest persisted heartbeat.
+   */
+  private async hydrateNodeFromDb(dbNode: {
+    id: UUID;
+    name: string;
+    kind: string;
+    public_key: string;
+    created_at: string | Date;
+    last_seen_at: string | Date | null;
+  }): Promise<NodeInfo> {
+    const db = getRepositories();
+    if (!db) {
+      throw new Error('Database repositories unavailable during node hydration');
+    }
+
+    // Retrieve latest heartbeat to restore chain continuity
+    const latestHbs = await db.heartbeats.listLatestByNode(dbNode.id, 1);
+    let expectedSeq = 0;
+    let lastVerifiedHash = GENESIS_PREV_HASH;
+    let lastSeenAtMs: number | null = dbNode.last_seen_at
+      ? new Date(dbNode.last_seen_at).getTime()
+      : null;
+
+    const latest = latestHbs && latestHbs.length > 0 ? latestHbs[0] : undefined;
+
+    if (latest) {
+      expectedSeq = latest.seq + 1;
+      lastVerifiedHash = latest.hash;
+      lastSeenAtMs = latest.t_rx_ms;
+    }
+
+    const info: NodeInfo = {
+      id: dbNode.id,
+      name: dbNode.name,
+      kind: dbNode.kind as NodeKind,
+      public_key: dbNode.public_key,
+      created_at:
+        typeof dbNode.created_at === 'string'
+          ? dbNode.created_at
+          : new Date(dbNode.created_at).toISOString(),
+      last_seen_at: lastSeenAtMs ? new Date(lastSeenAtMs).toISOString() : null,
+      online: false,
+    };
+
+    this.initNodeState(info, expectedSeq, lastVerifiedHash, lastSeenAtMs);
+    return info;
+  }
+
+  private async fetchAndHydrateNode(id: UUID): Promise<NodeInfo | null> {
+    const db = getRepositories();
+    if (!db) return null;
+
+    const dbNode = await db.nodes.findById(id);
+    if (!dbNode) return null;
+
+    return this.hydrateNodeFromDb(dbNode);
+  }
 
   /**
    * Registers a node.
@@ -66,32 +127,30 @@ export class NodeRegistry {
     // 2. Check database if configured
     let dbNodeId = params.id;
     if (isDbConfigured()) {
-      try {
-        const db = getRepositories();
-        if (db) {
-          const dbNode = await db.nodes.findByPublicKey(params.public_key);
-          if (dbNode) {
-            dbNodeId = dbNode.id;
-            const existingState = this.nodesById.get(dbNode.id);
-            if (existingState) {
-              return existingState.info;
-            }
-            // Hydrate in-memory
-            const info: NodeInfo = {
-              id: dbNode.id,
-              name: dbNode.name,
-              kind: dbNode.kind as NodeKind,
-              public_key: dbNode.public_key,
-              created_at: typeof dbNode.created_at === 'string' ? dbNode.created_at : new Date(dbNode.created_at).toISOString(),
-              last_seen_at: dbNode.last_seen_at ? new Date(dbNode.last_seen_at).toISOString() : null,
-              online: false,
-            };
-            this.initNodeState(info);
-            return info;
+      const db = getRepositories();
+      if (db) {
+        let dbNode;
+        try {
+          dbNode = await db.nodes.findByPublicKey(params.public_key);
+        } catch (err) {
+          logger.error({ err }, 'Failed to query database for existing node by public_key');
+          throw err;
+        }
+
+        if (dbNode) {
+          dbNodeId = dbNode.id;
+          const existingState = this.nodesById.get(dbNode.id);
+          if (existingState) {
+            return existingState.info;
+          }
+          // Hydrate in-memory with latest heartbeat
+          try {
+            return await this.hydrateNodeFromDb(dbNode);
+          } catch (err) {
+            logger.error({ err, id: dbNode.id }, 'Failed to hydrate node heartbeat state from database on register');
+            throw err;
           }
         }
-      } catch (err) {
-        logger.warn({ err }, 'Failed to query database for existing node by public_key');
       }
     }
 
@@ -110,31 +169,37 @@ export class NodeRegistry {
 
     // Attempt DB persistence if configured
     if (isDbConfigured()) {
-      try {
-        const db = getRepositories();
-        if (db) {
+      const db = getRepositories();
+      if (db) {
+        try {
           await db.nodes.create({
             id,
             name: info.name,
             kind: info.kind,
             public_key: info.public_key,
           });
+        } catch (err) {
+          logger.error({ err }, 'Failed to persist registered node to database');
+          throw err;
         }
-      } catch (err) {
-        logger.warn({ err }, 'Failed to persist registered node to database');
       }
     }
 
-    this.initNodeState(info);
+    this.initNodeState(info, 0, GENESIS_PREV_HASH, null);
     return info;
   }
 
-  private initNodeState(info: NodeInfo): NodeState {
+  private initNodeState(
+    info: NodeInfo,
+    expectedSeq = 0,
+    lastVerifiedHash = GENESIS_PREV_HASH,
+    lastSeenAtMs: number | null = null,
+  ): NodeState {
     const state: NodeState = {
       info,
-      expectedSeq: 0,
-      lastVerifiedHash: GENESIS_PREV_HASH,
-      lastSeenAtMs: null,
+      expectedSeq,
+      lastVerifiedHash,
+      lastSeenAtMs,
       connectedSockets: new Set<string>(),
       integrityFlags: {
         bad_signature: null,
@@ -161,27 +226,16 @@ export class NodeRegistry {
     }
 
     if (isDbConfigured()) {
-      try {
-        const db = getRepositories();
-        if (db) {
-          const dbNode = await db.nodes.findById(id);
-          if (dbNode) {
-            const info: NodeInfo = {
-              id: dbNode.id,
-              name: dbNode.name,
-              kind: dbNode.kind as NodeKind,
-              public_key: dbNode.public_key,
-              created_at: typeof dbNode.created_at === 'string' ? dbNode.created_at : new Date(dbNode.created_at).toISOString(),
-              last_seen_at: dbNode.last_seen_at ? new Date(dbNode.last_seen_at).toISOString() : null,
-              online: false,
-            };
-            this.initNodeState(info);
-            return info;
-          }
-        }
-      } catch (err) {
-        logger.warn({ err, id }, 'Failed to query database for node by id');
+      const active = this.hydrationLocks.get(id);
+      if (active) {
+        return active;
       }
+
+      const promise = this.fetchAndHydrateNode(id).finally(() => {
+        this.hydrationLocks.delete(id);
+      });
+      this.hydrationLocks.set(id, promise);
+      return promise;
     }
 
     return null;
