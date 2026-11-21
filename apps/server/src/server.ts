@@ -7,6 +7,7 @@ import { createSim } from '@chronyx/sim';
 import { createCoreRoutes } from './core/routes.js';
 import { registerLabRoutes } from './lab/index.js';
 import { apiErrorMiddleware } from './middleware/error.js';
+import { getRepositories } from './core/db/index.js';
 import type { LabContext, IFaultService } from './ctx.js';
 
 export function createServer() {
@@ -37,6 +38,7 @@ export function createServer() {
   // Setup Lab Context seam
   const engine = createEngine();
   const sim = createSim();
+  const db = getRepositories();
 
   const faultServiceStub: IFaultService = {
     start: async (spec) => ({
@@ -74,7 +76,7 @@ export function createServer() {
     engine,
     sim,
     faults: faultServiceStub,
-    db: null,
+    db,
     emit: (event, payload) => io.to('dashboard').emit(event, payload),
     sendToNode: (_node_id, _event, _payload) => {},
     getAssessments: () => [],

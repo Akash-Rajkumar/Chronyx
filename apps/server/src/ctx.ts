@@ -8,6 +8,7 @@ import type {
   Fault,
   UUID,
 } from '@chronyx/contracts';
+import type { DatabaseRepositories } from './core/db/index.js';
 
 export interface IFaultService {
   start(spec: FaultSpec): Promise<Fault>;
@@ -17,7 +18,7 @@ export interface IFaultService {
   markDetected(fault_id: UUID, at_ms: number, error_ms: number): Promise<void>;
 }
 
-export type Db = unknown; // Typed in P1-T2 with Supabase
+export type Db = DatabaseRepositories | null;
 
 export interface LabContext {
   now(): number;
@@ -32,4 +33,3 @@ export interface LabContext {
   getNodes(): NodeInfo[];
   getBaselineInputs(): { node_id: UUID; true_error_ms: number }[];
 }
-
