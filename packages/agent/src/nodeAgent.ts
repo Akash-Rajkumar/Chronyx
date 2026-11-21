@@ -6,6 +6,8 @@ import {
   RegisterNodeReqSchema,
   RegisterNodeResSchema,
   HeartbeatAckSchema,
+  ObservationCreateSchema,
+  ObservationSchema,
 } from '@chronyx/contracts';
 import type {
   Exchange,
@@ -15,6 +17,8 @@ import type {
   NodeInfo,
   FaultType,
   UUID,
+  ObservationCreate,
+  Observation,
 } from '@chronyx/contracts';
 import { createSignedHeartbeat } from '@chronyx/crypto';
 import {
@@ -25,6 +29,14 @@ import {
 } from './identity.js';
 import { BrowserClockShim, ActiveFault } from './clockShim.js';
 import { WakeLockManager } from './wakeLock.js';
+import { ClockEstimator } from './clockSync.js';
+import {
+  ObservationQueue,
+  PendingObservationsDisposalError,
+  DiscardReport,
+  QueuedObservationItem,
+  FlushResult,
+} from './observationQueue.js';
 
 export type AgentStatus =
   | 'idle'
@@ -60,6 +72,10 @@ export interface NodeAgentState {
   activeFaults: ActiveFault[];
   wakeLockActive: boolean;
   errorMessage: string | null;
+  clockCalibrated: boolean;
+  estimatedOffsetMs: number | null;
+  minRttMs: number | null;
+  pendingObservationsCount: number;
 }
 
 export interface ValidatedJoinAck {
@@ -125,6 +141,9 @@ export class NodeAgent {
   private socket: Socket | null = null;
   private clockShim: BrowserClockShim;
   private wakeLock: WakeLockManager;
+  private clockEstimator: ClockEstimator;
+  private observationQueue: ObservationQueue;
+  private submitHandler: ((obs: ObservationCreate) => Promise<Observation>) | null = null;
 
   private status: AgentStatus = 'idle';
   private seq = 0;
@@ -158,6 +177,8 @@ export class NodeAgent {
 
     this.clockShim = new BrowserClockShim();
     this.wakeLock = new WakeLockManager();
+    this.clockEstimator = new ClockEstimator();
+    this.observationQueue = new ObservationQueue();
   }
 
   public subscribe(listener: (state: NodeAgentState) => void): () => void {
@@ -179,6 +200,10 @@ export class NodeAgent {
       activeFaults: this.clockShim.getActiveFaults(),
       wakeLockActive: this.wakeLock.isActive(),
       errorMessage: this.errorMessage,
+      clockCalibrated: this.clockEstimator.isCalibrated(),
+      estimatedOffsetMs: this.clockEstimator.getEstimatedOffsetMs(),
+      minRttMs: this.clockEstimator.getMinRttMs(),
+      pendingObservationsCount: this.observationQueue.size(),
     };
   }
 
@@ -188,6 +213,14 @@ export class NodeAgent {
 
   public getWakeLockManager(): WakeLockManager {
     return this.wakeLock;
+  }
+
+  public getClockEstimator(): ClockEstimator {
+    return this.clockEstimator;
+  }
+
+  public getObservationQueue(): ObservationQueue {
+    return this.observationQueue;
   }
 
   private notify(): void {
@@ -457,8 +490,17 @@ export class NodeAgent {
       const rtt = Math.max(0, (t4 - t1) - (parsedAck.t3 - parsedAck.t2));
       this.lastPingRttMs = rtt;
 
-      // Retain only latest eight valid exchanges
-      this.recentExchanges = [...this.recentExchanges, exchange].slice(-8);
+      // Pass raw exchange to clockEstimator
+      this.clockEstimator.addExchange(exchange);
+
+      // Retain latest eight raw exchanges for heartbeat protocol (NO filtering from heartbeat)
+      this.recentExchanges = this.clockEstimator.getRawExchanges();
+
+      // If newly calibrated and observations are queued, trigger flush
+      if (this.clockEstimator.isCalibrated() && this.observationQueue.size() > 0) {
+        void this.attemptFlushPendingObservations();
+      }
+
       this.notify();
     });
   }
@@ -491,7 +533,7 @@ export class NodeAgent {
         seq: this.seq,
         t_local_ms: this.clockShim.nodeNow(),
         prev_hash: this.prevHash,
-        exchange: this.recentExchanges.slice(-4),
+        exchange: this.recentExchanges.slice(-8),
         osc_residual_ms: this.clockShim.getOscResidualMs(),
         health: null, // browser nodes have no GNSS or camera receiver
       };
@@ -550,8 +592,25 @@ export class NodeAgent {
 
   /**
    * Graceful stop and full resource cleanup.
+   * Refuses silent disposal if pending observations remain in the queue,
+   * throwing PendingObservationsDisposalError unless force: true with an explicit
+   * discardReason is provided.
    */
-  public async stop(): Promise<void> {
+  public async stop(options?: { force?: boolean; discardReason?: string }): Promise<void> {
+    const pendingCount = this.observationQueue.size();
+    if (pendingCount > 0) {
+      if (!options?.force) {
+        throw new PendingObservationsDisposalError(
+          pendingCount,
+          this.observationQueue.getPendingIds(),
+        );
+      }
+      if (!options.discardReason || options.discardReason.trim().length === 0) {
+        throw new Error('Forced disposal requires an explicit non-empty discardReason');
+      }
+      this.observationQueue.discardPendingObservations(options.discardReason);
+    }
+
     this.isRunning = false;
     this.joinAttemptId++;
     this.heartbeatAttemptId++;
@@ -572,6 +631,92 @@ export class NodeAgent {
     this.keyMaterial = null;
     this.identity = null;
     this.nodeInfo = null;
+    this.clockEstimator.reset();
     this.setStatus('idle');
+  }
+
+  /**
+   * Records a raw observation event. If the clock is currently uncalibrated or socket is
+   * disconnected, the observation is safely deferred in the bounded queue (capacity: 32).
+   * Rejects the 33rd observation with QueueOverflowError if the queue is full.
+   */
+  public recordObservation(observation: {
+    kind: 'occultation_timing' | 'generic';
+    local_timestamp_ms?: number;
+    payload?: Record<string, unknown>;
+    customId?: string;
+  }): QueuedObservationItem {
+    if (!this.identity || !this.identity.nodeId) {
+      throw new Error('Cannot record observation: Node identity not initialized');
+    }
+
+    const localTimestamp =
+      observation.local_timestamp_ms ?? this.clockShim.nodeNow();
+
+    const queuedItem = this.observationQueue.enqueue({
+      node_id: this.identity.nodeId as UUID,
+      kind: observation.kind,
+      local_timestamp_ms: localTimestamp,
+      payload: observation.payload,
+      customId: observation.customId,
+    });
+
+    this.notify();
+
+    // If already calibrated and socket connected, attempt flush immediately
+    if (this.clockEstimator.isCalibrated() && this.socket?.connected) {
+      void this.attemptFlushPendingObservations();
+    }
+
+    return queuedItem;
+  }
+
+  /**
+   * Sets custom submission handler for observations (used in tests or custom transports).
+   */
+  public setObservationSubmitHandler(
+    handler: (obs: ObservationCreate) => Promise<Observation>,
+  ): void {
+    this.submitHandler = handler;
+  }
+
+  /**
+   * Flushes deferred observations in the queue using current calibrated offset.
+   * Only flushes when clockEstimator.isCalibrated() is true.
+   */
+  public async attemptFlushPendingObservations(): Promise<FlushResult | null> {
+    const offset = this.clockEstimator.getEstimatedOffsetMs();
+    if (offset === null || !this.clockEstimator.isCalibrated()) {
+      return null;
+    }
+
+    const submitFn =
+      this.submitHandler ||
+      (async (obsPayload: ObservationCreate) => {
+        const res = await fetch(`${this.config.baseUrl}${ROUTES.OBSERVATIONS}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(ObservationCreateSchema.parse(obsPayload)),
+        });
+        if (!res.ok) {
+          const errText = await res.text();
+          throw new Error(`HTTP ${res.status}: ${errText}`);
+        }
+        const data = await res.json();
+        return ObservationSchema.parse(data);
+      });
+
+    const result = await this.observationQueue.flush(offset, submitFn);
+    this.notify();
+    return result;
+  }
+
+  /**
+   * Explicit authorized discard API for pending observations.
+   */
+  public discardPendingObservations(reason: string): DiscardReport {
+    const report = this.observationQueue.discardPendingObservations(reason);
+    this.notify();
+    return report;
   }
 }

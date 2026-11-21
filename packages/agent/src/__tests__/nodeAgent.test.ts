@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Socket } from 'socket.io-client';
 import { NodeAgent } from '../nodeAgent.js';
 import { clearIdentity } from '../identity.js';
-import { GENESIS_PREV_HASH, SOCKET_EVENTS } from '@chronyx/contracts';
+import { GENESIS_PREV_HASH, SOCKET_EVENTS, HeartbeatBodySchema } from '@chronyx/contracts';
 import type { Heartbeat, EngineConfig } from '@chronyx/contracts';
 import { verifyHeartbeat } from '@chronyx/crypto';
 
@@ -308,5 +308,157 @@ describe('NodeAgent Protocols, Security & Chain Reliability (P3-T2)', () => {
 
     // Must still remain at seq 0 (late response was safely discarded)
     expect(agent.getState().seq).toBe(0);
+  });
+
+  describe('P3-T8 Clock Estimator, Observation Queue & Lifecycle Integration', () => {
+    // Req 26: Heartbeat payload compatibility with latest 8 exchanges in existing frozen format
+    it('T8-C1: transmits all available exchanges up to eight in original order, including high-RTT samples, passing HeartbeatBodySchema', async () => {
+      const agent = new NodeAgent({ storageKey: TEST_STORAGE_KEY });
+      await agent.register();
+
+      let submittedHeartbeat: Heartbeat | null = null;
+      const fakeSocket: MockSocket = {
+        connected: true,
+        emit: (event: string, data?: unknown, callback?: (ack: unknown) => void) => {
+          if (event === SOCKET_EVENTS.HEARTBEAT && callback) {
+            submittedHeartbeat = data as Heartbeat;
+            callback({ ok: true, server_rx_ms: 1700000000500 });
+          }
+        },
+      };
+      (agent as unknown as { socket: Socket | null }).socket = fakeSocket as unknown as Socket;
+
+      // Case 1: Fewer than eight available exchanges (e.g. 5 exchanges) - all must be transmitted
+      const clockEstimator = agent.getClockEstimator();
+      for (let i = 1; i <= 5; i++) {
+        clockEstimator.addExchange({
+          t1: i * 1000,
+          t2: i * 1000 + 10,
+          t3: i * 1000 + 15,
+          t4: i * 1000 + (i === 3 ? 450 : 25), // exchange #3 has RTT = 450 - 5 = 445ms (> 200ms)
+        });
+      }
+
+      (agent as unknown as { recentExchanges: unknown[] }).recentExchanges = clockEstimator.getRawExchanges();
+
+      let ack = await agent.sendHeartbeat();
+      expect(ack?.ok).toBe(true);
+
+      // Verify fewer than 8 (5) are all transmitted
+      expect(submittedHeartbeat).toBeDefined();
+      expect(submittedHeartbeat!.exchange.length).toBe(5);
+      // Verify high-RTT sample is retained
+      expect(submittedHeartbeat!.exchange[2]!.t4).toBe(3450);
+      // Verify order and values preserved
+      expect(submittedHeartbeat!.exchange[0]!.t1).toBe(1000);
+      expect(submittedHeartbeat!.exchange[4]!.t1).toBe(5000);
+      // Passes frozen HeartbeatBodySchema
+      expect(() => HeartbeatBodySchema.parse(submittedHeartbeat)).not.toThrow();
+
+      // Case 2: Now add 5 more exchanges (total 10 added, capacity 8)
+      for (let i = 6; i <= 10; i++) {
+        clockEstimator.addExchange({
+          t1: i * 1000,
+          t2: i * 1000 + 10,
+          t3: i * 1000 + 15,
+          t4: i * 1000 + 25,
+        });
+      }
+
+      (agent as unknown as { recentExchanges: unknown[] }).recentExchanges = clockEstimator.getRawExchanges();
+
+      ack = await agent.sendHeartbeat();
+      expect(ack?.ok).toBe(true);
+
+      // Verify exactly eight available exchanges are transmitted, no more than eight
+      expect(submittedHeartbeat!.exchange.length).toBe(8);
+      // Verify chronological order: window holds items 3 through 10
+      expect(submittedHeartbeat!.exchange[0]!.t1).toBe(3000); // exchange #3
+      expect(submittedHeartbeat!.exchange[0]!.t4).toBe(3450); // exchange #3 high RTT retained!
+      expect(submittedHeartbeat!.exchange[7]!.t1).toBe(10000); // exchange #10
+      // Passes frozen HeartbeatBodySchema
+      expect(() => HeartbeatBodySchema.parse(submittedHeartbeat)).not.toThrow();
+    });
+
+    it('defers observations when uncalibrated and flushes with current calibrated offset once calibrated', async () => {
+      const agent = new NodeAgent({ storageKey: TEST_STORAGE_KEY });
+      await agent.register();
+
+      const fakeSocket: MockSocket = {
+        connected: true,
+        emit: vi.fn(),
+      };
+      (agent as unknown as { socket: Socket | null }).socket = fakeSocket as unknown as Socket;
+
+      const submittedObs: unknown[] = [];
+      agent.setObservationSubmitHandler(async (obs) => {
+        submittedObs.push(obs);
+        return {
+          id: '55555555-5555-5555-5555-555555555555',
+          node_id: obs.node_id,
+          kind: obs.kind,
+          observed_at_ms: obs.observed_at_ms,
+          payload: obs.payload,
+          status: 'accepted',
+          confidence: 0.98,
+          state_at_ingest: 'trusted',
+          created_at: new Date().toISOString(),
+        };
+      });
+
+      // When uncalibrated, recording observation defers it to queue
+      expect(agent.getState().clockCalibrated).toBe(false);
+      const queued = agent.recordObservation({
+        kind: 'occultation_timing',
+        local_timestamp_ms: 10000,
+        payload: { event: 'ingress' },
+      });
+
+      expect(queued.id).toBeDefined();
+      expect(agent.getState().pendingObservationsCount).toBe(1);
+      expect(submittedObs.length).toBe(0); // Not submitted yet!
+
+      // Now supply 3 valid pings to calibrate clock (offset = +50ms)
+      const clockEstimator = agent.getClockEstimator();
+      clockEstimator.addExchange({ t1: 1050, t2: 1010, t3: 1015, t4: 1075 }); // rtt 20, offset +50
+      clockEstimator.addExchange({ t1: 2050, t2: 2010, t3: 2015, t4: 2075 });
+      clockEstimator.addExchange({ t1: 3050, t2: 3010, t3: 3015, t4: 3075 });
+      expect(clockEstimator.isCalibrated()).toBe(true);
+
+      // Trigger flush
+      const flushRes = await agent.attemptFlushPendingObservations();
+      expect(flushRes?.submittedCount).toBe(1);
+      expect(agent.getState().pendingObservationsCount).toBe(0);
+
+      // Verify timestamp corrected at flush time: 10000 - (+50) = 9950ms
+      expect(submittedObs.length).toBe(1);
+      const submitted = submittedObs[0] as { observed_at_ms: number; payload: { client_observation_id: string } };
+      expect(submitted.observed_at_ms).toBe(9950);
+      expect(submitted.payload.client_observation_id).toBe(queued.id);
+    });
+
+    it('refuses silent disposal via stop() when observations are pending and requires explicit discard', async () => {
+      const agent = new NodeAgent({ storageKey: TEST_STORAGE_KEY });
+      await agent.register();
+
+      agent.recordObservation({
+        kind: 'generic',
+        local_timestamp_ms: 5000,
+      });
+
+      expect(agent.getState().pendingObservationsCount).toBe(1);
+
+      // Normal stop() must throw PendingObservationsDisposalError
+      await expect(agent.stop()).rejects.toThrow('Refusing permanent disposal: 1 pending observations remain in queue');
+
+      // Explicit authorized discard clears queue with audit report
+      const report = agent.discardPendingObservations('Manual shutdown requested by operator');
+      expect(report.discardedCount).toBe(1);
+      expect(report.reason).toBe('Manual shutdown requested by operator');
+      expect(agent.getState().pendingObservationsCount).toBe(0);
+
+      // Now stop() succeeds cleanly
+      await expect(agent.stop()).resolves.toBeUndefined();
+    });
   });
 });

@@ -24,6 +24,10 @@ export interface JoinStoreState {
   activeFaults: ActiveFault[];
   wakeLockActive: boolean;
   errorMessage: string | null;
+  clockCalibrated: boolean;
+  estimatedOffsetMs: number | null;
+  minRttMs: number | null;
+  pendingObservationsCount: number;
 
   // Actions
   setNodeName: (name: string) => void;
@@ -51,6 +55,10 @@ export const useJoinStore = create<JoinStoreState>((set, get) => ({
   activeFaults: [],
   wakeLockActive: false,
   errorMessage: null,
+  clockCalibrated: false,
+  estimatedOffsetMs: null,
+  minRttMs: null,
+  pendingObservationsCount: 0,
 
   setNodeName: (name: string) => {
     set({ nodeName: name });
@@ -69,6 +77,10 @@ export const useJoinStore = create<JoinStoreState>((set, get) => ({
       activeFaults: agentState.activeFaults,
       wakeLockActive: agentState.wakeLockActive,
       errorMessage: agentState.errorMessage,
+      clockCalibrated: agentState.clockCalibrated,
+      estimatedOffsetMs: agentState.estimatedOffsetMs,
+      minRttMs: agentState.minRttMs,
+      pendingObservationsCount: agentState.pendingObservationsCount,
     });
   },
 
@@ -157,7 +169,7 @@ export const useJoinStore = create<JoinStoreState>((set, get) => ({
 
 export function resetJoinStore(): void {
   if (agentInstance) {
-    void agentInstance.stop();
+    void agentInstance.stop({ force: true, discardReason: 'store reset' });
     if (unsubscribe) {
       unsubscribe();
       unsubscribe = null;
@@ -178,5 +190,9 @@ export function resetJoinStore(): void {
     activeFaults: [],
     wakeLockActive: false,
     errorMessage: null,
+    clockCalibrated: false,
+    estimatedOffsetMs: null,
+    minRttMs: null,
+    pendingObservationsCount: 0,
   });
 }
