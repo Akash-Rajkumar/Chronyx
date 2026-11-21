@@ -15,6 +15,7 @@ import {
   EngineConfigSchema,
   IncidentSummarySchema,
   IncidentSchema,
+  ObservationCreateSchema,
   ObservationSchema,
   PassportSchema,
   FaultSchema,
@@ -34,6 +35,7 @@ import type {
   IncidentSummary,
   Incident,
   Observation,
+  ObservationCreate,
   Passport,
   Fault,
   FaultSpec,
@@ -194,6 +196,17 @@ export const api = {
 
   getObservations: async (): Promise<Observation[]> => {
     return request<Observation[]>(ROUTES.OBSERVATIONS, undefined, z.array(ObservationSchema));
+  },
+
+  createObservation: async (data: ObservationCreate): Promise<Observation> => {
+    return request<Observation>(
+      ROUTES.OBSERVATIONS,
+      {
+        method: 'POST',
+        body: JSON.stringify(ObservationCreateSchema.parse(data)),
+      },
+      ObservationSchema,
+    );
   },
 
   getPassport: async (id: string): Promise<Passport> => {
