@@ -1,20 +1,27 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
+import type { JoinInfo } from '@chronyx/contracts';
+import { api } from '../../api/client.js';
+import { initDashboardSocket } from '../../api/socket.js';
 import {
+  useAssessments,
+  useConnectionStatus,
   useDashboardStore,
+  useIsLoading,
   useNetworkHealth,
   useNodes,
-  useAssessments,
   useRecentTransitions,
-  useIsLoading,
   useStoreError,
-  useConnectionStatus,
 } from '../../state/useDashboardStore.js';
-import { StateChip } from '../../ui/StateChip.js';
 import { ConfidenceRing } from '../../ui/ConfidenceRing.js';
-import { Skeleton } from '../../ui/Skeleton.js';
 import { EmptyState } from '../../ui/EmptyState.js';
-import { initDashboardSocket } from '../../api/socket.js';
-import { Link } from 'react-router-dom';
+import { Skeleton } from '../../ui/Skeleton.js';
+import { Sparkline } from '../../ui/Sparkline.js';
+import { StateChip } from '../../ui/StateChip.js';
+import { QuorumConstellation } from './QuorumConstellation.js';
+
+const MAX_SPARK_POINTS = 60;
 
 /**
  * Live Overview Page (Part G4.1)
@@ -51,17 +58,73 @@ export function OverviewPage() {
   const connectionStatus = isClient ? connectionStatusHook : storeState!.connectionStatus;
 
   const isMock = connectionStatus === 'mock';
+  const isLiveStream = !isMock && connectionStatus === 'connected';
+
+  // Client-only 60-sample offset ring per node from incoming live assessments (never fabricated)
+  const [offsetHistory, setOffsetHistory] = useState<Record<string, number[]>>({});
+  const lastSampleTsRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    const entries = Object.values(assessments);
+    if (entries.length === 0) return;
+
+    let changed = false;
+    const updates: Record<string, number> = {};
+    for (const a of entries) {
+      if (lastSampleTsRef.current[a.node_id] !== a.t_ms) {
+        lastSampleTsRef.current[a.node_id] = a.t_ms;
+        updates[a.node_id] = a.error_est_ms;
+        changed = true;
+      }
+    }
+    if (!changed) return;
+
+    setOffsetHistory((prev) => {
+      const next = { ...prev };
+      for (const [nodeId, val] of Object.entries(updates)) {
+        const series = prev[nodeId] ?? [];
+        next[nodeId] = [...series.slice(-(MAX_SPARK_POINTS - 1)), val];
+      }
+      return next;
+    });
+  }, [assessments]);
+
+  const sortedNodes = useMemo(
+    () => [...nodes].sort((a, b) => a.name.localeCompare(b.name)),
+    [nodes],
+  );
+
+  const realNodesCount = useMemo(
+    () => nodes.filter((n) => n.kind === 'browser').length,
+    [nodes],
+  );
+
+  const [joinInfo, setJoinInfo] = useState<JoinInfo | null>(null);
+  useEffect(() => {
+    if (!isClient || realNodesCount > 0) return;
+    let active = true;
+    api
+      .getJoinInfo()
+      .then((info) => {
+        if (active) setJoinInfo(info);
+      })
+      .catch(() => {
+        // Fallback link to /join remains available without error noise
+      });
+    return () => {
+      active = false;
+    };
+  }, [isClient, realNodesCount]);
 
   // Compute honest alert strip state
   const hasTransitions = recentTransitions.length > 0;
   const latestTransition = recentTransitions[0];
 
   let alertMessage: React.ReactNode;
-  let alertStyle = 'chronyx-glass-subtle border-white/[0.1] text-muted';
+  let alertStyle = 'mc-well border-white/[0.1] text-muted';
 
   if (hasTransitions && latestTransition) {
-    alertStyle =
-      'chronyx-glass-subtle border-white/[0.12] border-l-2 border-l-trust-suspect text-amber-100';
+    alertStyle = 'mc-well border-white/[0.12] border-l-2 border-l-trust-suspect text-amber-100';
     alertMessage = (
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span>
@@ -82,7 +145,7 @@ export function OverviewPage() {
 
     if (allTrusted) {
       alertStyle =
-        'chronyx-glass-subtle border-white/[0.12] border-l-2 border-l-trust-trusted text-emerald-100';
+        'mc-well border-white/[0.12] border-l-2 border-l-trust-trusted text-emerald-100';
       alertMessage = (
         <span>
           <strong className="font-semibold text-trust-trusted">Cluster Operational:</strong> All{' '}
@@ -91,7 +154,7 @@ export function OverviewPage() {
       );
     } else if (hasAnomalies) {
       alertStyle =
-        'chronyx-glass-subtle border-rose-400/25 border-l-2 border-l-trust-quarantined text-rose-100';
+        'mc-well border-rose-400/25 border-l-2 border-l-trust-quarantined text-rose-100';
       alertMessage = (
         <span>
           <strong className="font-semibold text-trust-quarantined">Cluster Anomaly Active:</strong>{' '}
@@ -99,7 +162,7 @@ export function OverviewPage() {
         </span>
       );
     } else {
-      alertStyle = 'chronyx-glass-subtle border-white/[0.12] text-foreground/85';
+      alertStyle = 'mc-well border-white/[0.12] text-foreground/85';
       alertMessage = (
         <span>
           Cluster active ({network.trusted}/{network.n} trusted, {network.recovering} recovering).
@@ -108,19 +171,19 @@ export function OverviewPage() {
       );
     }
   } else {
-    // Empty or unavailable network data: neutral message
-    alertStyle = 'chronyx-glass-subtle border-white/[0.1] text-muted';
+    alertStyle = 'mc-well border-white/[0.1] text-muted';
     alertMessage = <span>Observatory cluster standby. Telemetry status unavailable.</span>;
   }
 
   const onlineCount = nodes.filter((n) => n.online).length;
-  const isLiveStream = !isMock && connectionStatus === 'connected';
+  const virtualCount = nodes.length - realNodesCount;
+  const fallbackJoinUrl = isClient ? `${window.location.origin}/join` : '/join';
+  const qrValue = joinInfo?.join_url ?? fallbackJoinUrl;
 
   return (
     <div className="space-y-6">
-      {/* Asymmetric Live Operations Header & Focal Network Health Instrument */}
+      {/* Band 1: Asymmetric Operations Header & Focal Network Health Instrument */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-        {/* Left (7 cols): Title, Honest Disclosure & Flat Hairline Alert Strip */}
         <div className="lg:col-span-7 flex flex-col justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center gap-3">
@@ -138,7 +201,6 @@ export function OverviewPage() {
             </p>
           </div>
 
-          {/* Alert Strip: Transition or honest cluster state */}
           <div
             data-testid="alert-strip"
             className={`px-4 py-3 rounded-[10px] text-xs border transition-colors duration-[180ms] ease-out ${alertStyle}`}
@@ -147,11 +209,10 @@ export function OverviewPage() {
           </div>
         </div>
 
-        {/* Right (5 cols): Expressive Primary Network Health Instrument */}
         <div
           data-testid="network-health"
-          className={`lg:col-span-5 chronyx-glass-elevated chronyx-corner-ticks rounded-[14px] p-5 flex flex-col justify-between gap-4 ${
-            isLiveStream ? 'chronyx-live-surface' : ''
+          className={`lg:col-span-5 mc-panel-primary mc-ticks rounded-[14px] p-5 flex flex-col justify-between gap-4 ${
+            isLiveStream ? 'mc-live-surface' : ''
           }`}
         >
           <div className="flex items-start justify-between gap-4">
@@ -160,7 +221,7 @@ export function OverviewPage() {
                 <span>Network Health</span>
                 {isLiveStream && (
                   <span
-                    className="h-1.5 w-1.5 rounded-full bg-trust-trusted chronyx-live-dot"
+                    className="h-1.5 w-1.5 rounded-full bg-trust-trusted mc-live-dot"
                     aria-hidden="true"
                   />
                 )}
@@ -187,7 +248,6 @@ export function OverviewPage() {
             </div>
           </div>
 
-          {/* Hairline-Divided Trust Breakdown (no nested card clutter) */}
           <div className="grid grid-cols-4 divide-x divide-white/[0.08] pt-3 border-t border-white/[0.08] font-mono tabular-nums">
             <div className="pr-3">
               <span className="text-[10px] text-muted block">Trusted</span>
@@ -224,7 +284,124 @@ export function OverviewPage() {
         </div>
       )}
 
-      {/* Instrument Section Divider for Nodes Grid */}
+      {/* Band 2: Centerpiece Live Quorum Constellation + Contextual Cluster Panel */}
+      {nodes.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+          <div className="lg:col-span-8 mc-panel-primary rounded-[14px] p-5 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-foreground">
+                  Timing Quorum Constellation
+                </h3>
+                <p className="text-xs text-muted">
+                  Star-topology verification around the hub — click any node to inspect streams
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-[11px] font-mono text-muted">
+                <span className="text-trust-trusted">● Trusted</span>
+                <span className="text-trust-suspect">▲ Suspect</span>
+                <span className="text-trust-quarantined">■ Quarantined</span>
+              </div>
+            </div>
+
+            <QuorumConstellation
+              nodes={nodes}
+              assessments={assessments}
+              network={network}
+              isLiveStream={isLiveStream}
+            />
+          </div>
+
+          <div className="lg:col-span-4 mc-panel rounded-[14px] p-5 flex flex-col justify-between gap-4">
+            {realNodesCount === 0 ? (
+              <>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      Add a Real Browser Node
+                    </h3>
+                    <span className="text-[11px] font-mono text-muted">
+                      {virtualCount} virtual
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted leading-relaxed">
+                    Virtual nodes simulate GNSS and camera-trigger streams in software. Scan or
+                    open Join to add a real browser clock over this network.
+                  </p>
+                </div>
+
+                {isClient && (
+                  <div className="flex items-center gap-4 py-3 border-y border-white/[0.08]">
+                    <div className="p-2 rounded-lg bg-white shrink-0">
+                      <QRCodeSVG value={qrValue} size={76} bgColor="#FFFFFF" fgColor="#060B16" />
+                    </div>
+                    <div className="min-w-0 space-y-1">
+                      <span className="text-[11px] font-mono text-muted block">Join URL</span>
+                      <span className="text-xs font-mono text-foreground break-all block">
+                        {qrValue}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <Link
+                  to="/join"
+                  className="inline-flex items-center justify-center px-3.5 py-2.5 rounded-[10px] text-xs font-semibold bg-accent-cyan/[0.16] text-accent-cyan border border-accent-cyan/40 hover:bg-accent-cyan/[0.24] transition-colors duration-[180ms] ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+                >
+                  Open Join as a Node →
+                </Link>
+              </>
+            ) : (
+              <>
+                <div className="space-y-1.5">
+                  <h3 className="text-sm font-semibold text-foreground">Cluster Composition</h3>
+                  <p className="text-xs text-muted">
+                    Quorum tolerates f faulty nodes when n ≥ 3f + 1 under independent faults.
+                  </p>
+                </div>
+
+                <div className="mc-well rounded-[10px] divide-y divide-white/[0.06] text-xs font-mono">
+                  <div className="flex items-center justify-between px-3 py-2.5">
+                    <span className="text-muted">Real browser nodes</span>
+                    <span className="text-foreground font-semibold tabular-nums">
+                      {realNodesCount}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-3 py-2.5">
+                    <span className="text-muted">Simulated virtual nodes</span>
+                    <span className="text-foreground font-semibold tabular-nums">
+                      {virtualCount}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between px-3 py-2.5">
+                    <span className="text-muted">Fault tolerance (f)</span>
+                    <span className="text-accent-cyan font-semibold tabular-nums">
+                      {network ? network.fault_tolerance_f : '--'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 pt-1">
+                  <Link
+                    to="/compare"
+                    className="flex-1 text-center px-3 py-2 rounded-[10px] text-xs font-medium bg-white/[0.06] border border-white/[0.13] text-foreground hover:border-accent-cyan/45 transition-colors duration-[180ms] ease-out"
+                  >
+                    Before vs After
+                  </Link>
+                  <Link
+                    to="/redteam"
+                    className="flex-1 text-center px-3 py-2 rounded-[10px] text-xs font-medium bg-trust-quarantined/[0.12] border border-trust-quarantined/35 text-trust-quarantined hover:bg-trust-quarantined/[0.2] transition-colors duration-[180ms] ease-out"
+                  >
+                    Red-Team
+                  </Link>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Section Divider for Node Telemetry Cards */}
       {nodes.length > 0 && (
         <div className="flex items-center gap-4 pt-1">
           <h3 className="text-sm font-medium text-foreground shrink-0">Observatory Nodes</h3>
@@ -235,7 +412,7 @@ export function OverviewPage() {
         </div>
       )}
 
-      {/* Nodes Grid */}
+      {/* Band 3: Deterministic Node Telemetry Cards */}
       {isLoading && nodes.length === 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           <Skeleton height={188} />
@@ -257,11 +434,12 @@ export function OverviewPage() {
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {nodes.map((node) => {
+          {sortedNodes.map((node) => {
             const assessment = assessments[node.id];
             const hasAssessment = Boolean(assessment);
             const hasConfidence =
               assessment?.confidence !== undefined && assessment?.confidence !== null;
+            const sparkData = offsetHistory[node.id] ?? [];
 
             const anomalyBorderClass =
               assessment?.state === 'quarantined'
@@ -270,13 +448,19 @@ export function OverviewPage() {
                   ? 'border-trust-suspect/40'
                   : '';
 
+            const sparkStroke =
+              assessment?.state === 'quarantined'
+                ? '#FF5C5C'
+                : assessment?.state === 'suspect'
+                  ? '#F5A524'
+                  : '#3DD6F5';
+
             return (
               <div
                 key={node.id}
                 data-testid="node-card"
-                className={`chronyx-glass rounded-xl p-4 space-y-3.5 ${anomalyBorderClass}`}
+                className={`mc-panel rounded-[12px] p-4 space-y-3.5 ${anomalyBorderClass}`}
               >
-                {/* Band 1: Identity & Trust State */}
                 <div className="flex justify-between items-start gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -287,7 +471,7 @@ export function OverviewPage() {
                         {node.name}
                       </Link>
                       <span className="text-[11px] font-mono text-muted/80 shrink-0">
-                        · {node.kind}
+                        · {node.kind === 'virtual' ? 'Simulated' : 'Real'}
                       </span>
                     </div>
                     <span className="text-[11px] text-muted/75 font-mono block mt-0.5">
@@ -295,7 +479,6 @@ export function OverviewPage() {
                     </span>
                   </div>
 
-                  {/* Trust State Chip: Never default missing to Trusted */}
                   {hasAssessment && assessment ? (
                     <StateChip state={assessment.state} size="sm" />
                   ) : (
@@ -309,9 +492,7 @@ export function OverviewPage() {
                   )}
                 </div>
 
-                {/* Band 2: Confidence Ring & Aligned Offset / Uncertainty Column */}
                 <div className="flex items-center justify-between gap-4 py-3 border-y border-white/[0.07]">
-                  {/* Confidence Ring: Never default missing to 1 or 0% */}
                   {hasConfidence && assessment ? (
                     <ConfidenceRing
                       confidence={assessment.confidence}
@@ -349,30 +530,38 @@ export function OverviewPage() {
                   </div>
                 </div>
 
-                {/* Band 3: Technical Residuals & Online Status */}
-                <div className="flex items-center justify-between text-[11px] font-mono text-muted tabular-nums">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between gap-3">
+                  <Sparkline
+                    data={sparkData}
+                    width={110}
+                    height={24}
+                    strokeColor={sparkStroke}
+                    fillColor="rgba(61, 214, 245, 0.08)"
+                  />
+
+                  <div className="flex items-center gap-2.5 text-[11px] font-mono text-muted tabular-nums">
                     <span>z: {assessment ? assessment.z.toFixed(2) : '--'}</span>
                     <span className="text-white/20">·</span>
                     <span>cusum: {assessment ? `${assessment.cusum.toFixed(2)}σ` : '--'}</span>
-                  </div>
-                  <span
-                    className={`inline-flex items-center gap-1.5 ${
-                      node.online ? 'text-trust-trusted' : 'text-muted'
-                    }`}
-                  >
+                    <span className="text-white/20">·</span>
                     <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        node.online
-                          ? isLiveStream
-                            ? 'bg-trust-trusted chronyx-live-dot'
-                            : 'bg-trust-trusted'
-                          : 'bg-muted/50'
+                      className={`inline-flex items-center gap-1 ${
+                        node.online ? 'text-trust-trusted' : 'text-muted'
                       }`}
-                      aria-hidden="true"
-                    />
-                    {node.online ? 'Online' : 'Offline'}
-                  </span>
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          node.online
+                            ? isLiveStream
+                              ? 'bg-trust-trusted mc-live-dot'
+                              : 'bg-trust-trusted'
+                            : 'bg-muted/50'
+                        }`}
+                        aria-hidden="true"
+                      />
+                      {node.online ? 'Online' : 'Offline'}
+                    </span>
+                  </div>
                 </div>
               </div>
             );

@@ -10,11 +10,13 @@ import {
 export interface SidebarProps {
   className?: string;
   showPassport?: boolean;
+  onOpenQrModal?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   className = '',
   showPassport = false, // Hidden until implemented (Phase 3 & Correction 2)
+  onOpenQrModal,
 }) => {
   const connectionStatus = useConnectionStatus();
   const anchors = useAnchors();
@@ -37,7 +39,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <aside
-      className={`w-64 shrink-0 h-full flex flex-col justify-between p-4 border-r border-white/[0.09] bg-[#070E1E]/78 backdrop-blur-xl shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] ${className}`}
+      className={`w-64 shrink-0 h-full flex flex-col justify-between p-4 border-r border-white/[0.09] bg-[#070D1C]/82 backdrop-blur-xl shadow-[inset_-1px_0_0_rgba(255,255,255,0.04)] ${className}`}
     >
       <div className="space-y-6">
         {/* Observatory Brand Header */}
@@ -65,59 +67,81 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </div>
 
-        {/* Primary Navigation */}
-        <div className="space-y-2">
-          <div className="px-3 text-xs font-medium text-muted/75">Observatory</div>
-          <nav className="flex flex-col gap-1" aria-label="Main navigation">
-            <NavLink to="/" end className={navLinkClass}>
-              Overview
-            </NavLink>
-            <NavLink to="/compare" className={navLinkClass}>
-              Before vs After
-            </NavLink>
-            <NavLink to="/redteam" className={navLinkClass}>
-              Red-Team Console
-            </NavLink>
-            <NavLink to="/science" className={navLinkClass}>
-              Science Impact
-            </NavLink>
-            <NavLink to="/scoreboard" className={navLinkClass}>
-              Scoreboard
-            </NavLink>
-            <NavLink to="/incidents" className={navLinkClass}>
-              Incidents
-            </NavLink>
-            {showPassport && (
-              <NavLink to="/passport" className={navLinkClass}>
-                Timing Passport
+        {/* Grouped Navigation */}
+        <nav className="space-y-4" aria-label="Main navigation">
+          <div className="space-y-1.5">
+            <div className="px-3 text-xs font-medium text-muted/75">Operations</div>
+            <div className="flex flex-col gap-1">
+              <NavLink to="/" end className={navLinkClass}>
+                Overview
               </NavLink>
-            )}
-          </nav>
-        </div>
+              <NavLink to="/compare" className={navLinkClass}>
+                Before vs After
+              </NavLink>
+              <NavLink to="/redteam" className={navLinkClass}>
+                Red-Team Console
+              </NavLink>
+              <NavLink to="/science" className={navLinkClass}>
+                Science Impact
+              </NavLink>
+            </div>
+          </div>
+
+          <div className="pt-3 border-t border-white/[0.07] space-y-1.5">
+            <div className="px-3 text-xs font-medium text-muted/75">Evidence</div>
+            <div className="flex flex-col gap-1">
+              <NavLink to="/scoreboard" className={navLinkClass}>
+                Scoreboard
+              </NavLink>
+              <NavLink to="/incidents" className={navLinkClass}>
+                Incidents
+              </NavLink>
+              {showPassport && (
+                <NavLink to="/passport" className={navLinkClass}>
+                  Timing Passport
+                </NavLink>
+              )}
+            </div>
+          </div>
+        </nav>
       </div>
 
       {/* Bottom Join Action & Technical Status Table */}
       <div className="space-y-3 pt-4 border-t border-white/[0.08]">
-        <NavLink
-          to="/join"
-          data-testid="join-button"
-          className="w-full py-2.5 px-3 rounded-[10px] bg-accent-cyan/[0.14] hover:bg-accent-cyan/[0.22] border border-accent-cyan/40 hover:border-accent-cyan/60 text-accent-cyan text-sm font-medium flex items-center justify-center gap-2 transition-[background-color,border-color,transform,box-shadow] duration-[180ms] ease-out shadow-[inset_0_1px_0_rgba(165,243,252,0.28)] hover:-translate-y-[1px] active:translate-y-[0.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
-        >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.75"
-            aria-hidden="true"
+        <div className="flex items-center gap-2">
+          <NavLink
+            to="/join"
+            data-testid="join-button"
+            className="flex-1 py-2.5 px-3 rounded-[10px] bg-accent-cyan/[0.14] hover:bg-accent-cyan/[0.22] border border-accent-cyan/40 hover:border-accent-cyan/60 text-accent-cyan text-sm font-medium flex items-center justify-center gap-2 transition-[background-color,border-color,transform,box-shadow] duration-[180ms] ease-out shadow-[inset_0_1px_0_rgba(165,243,252,0.28)] hover:-translate-y-[1px] active:translate-y-[0.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
           >
-            <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-          </svg>
-          <span>Join as a Node</span>
-        </NavLink>
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.75"
+              aria-hidden="true"
+            >
+              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            </svg>
+            <span>Join as a Node</span>
+          </NavLink>
 
-        <div className="chronyx-glass-subtle rounded-[10px] divide-y divide-white/[0.06] text-xs">
+          {onOpenQrModal && (
+            <button
+              type="button"
+              onClick={onOpenQrModal}
+              title="Show QR join code"
+              aria-label="Show QR join code"
+              className="py-2.5 px-2.5 rounded-[10px] bg-white/[0.05] hover:bg-white/[0.1] border border-white/[0.14] hover:border-accent-cyan/45 text-foreground text-xs font-mono transition-[background-color,border-color] duration-[180ms] ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/60"
+            >
+              QR
+            </button>
+          )}
+        </div>
+
+        <div className="mc-well rounded-[10px] divide-y divide-white/[0.06] text-xs">
           <div className="flex items-center justify-between px-3 py-2 text-muted">
             <span>Contract</span>
             <span className="font-mono text-[11px] text-foreground/90">v{CONTRACT_VERSION}</span>
@@ -140,9 +164,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   isMock
                     ? 'bg-accent-cyan'
                     : isConnected
-                      ? 'bg-trust-trusted chronyx-live-dot'
+                      ? 'bg-trust-trusted mc-live-dot'
                       : isConnecting
-                        ? 'bg-trust-suspect chronyx-live-dot'
+                        ? 'bg-trust-suspect mc-live-dot'
                         : 'bg-trust-quarantined'
                 }`}
               />
