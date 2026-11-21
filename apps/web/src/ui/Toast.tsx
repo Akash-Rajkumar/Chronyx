@@ -32,7 +32,7 @@ export const Toast: React.FC<ToastProps> = ({
   return (
     <div
       role="alert"
-      className={`chronyx-glass-elevated flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm transition-[opacity,transform] duration-[180ms] ease-out ${typeStyles} ${className}`}
+      className={`mc-panel-primary flex items-center justify-between gap-3 px-4 py-3 rounded-[10px] text-sm transition-[opacity,transform] duration-[180ms] ease-out ${typeStyles} ${className}`}
     >
       <span>{message}</span>
       {onClose && (

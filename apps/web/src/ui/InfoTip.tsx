@@ -33,7 +33,7 @@ export const InfoTip: React.FC<InfoTipProps> = ({
       {visible && (
         <span
           role="tooltip"
-          className="chronyx-glass-elevated absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2.5 rounded-lg border-white/[0.18] text-foreground text-xs shadow-2xl z-50 pointer-events-none transition-opacity duration-[150ms] ease-out leading-relaxed font-normal"
+          className="mc-panel-primary absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-52 p-2.5 rounded-lg border-white/[0.18] text-foreground text-xs shadow-2xl z-50 pointer-events-none transition-opacity duration-[150ms] ease-out leading-relaxed font-normal"
         >
           {text}
           <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-[#121A2E]" />

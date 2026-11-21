@@ -4,12 +4,12 @@
 
 :root {
   color-scheme: dark;
-  --chronyx-canvas: #060b16;
-  --chronyx-glass-bg: rgba(15, 24, 44, 0.58);
-  --chronyx-glass-elevated: rgba(20, 31, 56, 0.74);
-  --chronyx-glass-subtle: rgba(7, 12, 24, 0.58);
-  --chronyx-glass-border: rgba(203, 213, 225, 0.11);
-  --chronyx-glass-highlight: rgba(255, 255, 255, 0.1);
+  --mc-canvas: #060b16;
+  --mc-panel-primary: rgba(15, 24, 44, 0.72);
+  --mc-panel: rgba(12, 20, 38, 0.62);
+  --mc-well: rgba(6, 11, 22, 0.68);
+  --mc-border-subtle: rgba(203, 213, 225, 0.11);
+  --mc-border-primary: rgba(203, 213, 225, 0.16);
 }
 
 body {
@@ -21,7 +21,7 @@ body {
   color: #e8eeff;
 }
 
-@keyframes chronyxLiveHeartbeat {
+@keyframes mcLiveHeartbeat {
   0%,
   100% {
     opacity: 1;
@@ -31,7 +31,7 @@ body {
   }
 }
 
-@keyframes chronyxLiveSheen {
+@keyframes mcLiveSheen {
   0% {
     transform: translateX(-120%);
   }
@@ -41,52 +41,62 @@ body {
   }
 }
 
+@keyframes mcStarDrift {
+  from {
+    transform: translateY(0px);
+  }
+  to {
+    transform: translateY(-2000px);
+  }
+}
+
 @layer components {
+  .mc-canvas,
   .chronyx-canvas {
     background-color: #060b16;
     background-image:
-      radial-gradient(ellipse 72% 48% at 14% 0%, rgba(61, 214, 245, 0.06), transparent 60%),
-      radial-gradient(ellipse 58% 44% at 48% 4%, rgba(99, 102, 241, 0.07), transparent 58%),
-      linear-gradient(180deg, #060b16 0%, #081020 55%, #060b16 100%);
+      radial-gradient(ellipse 75% 46% at 18% 0%, rgba(61, 214, 245, 0.065), transparent 62%),
+      radial-gradient(ellipse 62% 44% at 72% 4%, rgba(99, 102, 241, 0.075), transparent 60%),
+      linear-gradient(180deg, #060b16 0%, #091120 55%, #070d1b 100%);
   }
 
-  .chronyx-glass {
-    background: linear-gradient(
-      155deg,
-      rgba(15, 24, 44, 0.58) 0%,
-      rgba(10, 16, 30, 0.52) 100%
-    );
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1px solid var(--chronyx-glass-border);
-    box-shadow:
-      inset 0 1px 0 var(--chronyx-glass-highlight),
-      0 8px 24px rgba(2, 6, 23, 0.34);
-  }
-
+  .mc-panel-primary,
   .chronyx-glass-elevated {
     background: linear-gradient(
       155deg,
-      rgba(20, 31, 56, 0.74) 0%,
-      rgba(11, 19, 36, 0.66) 100%
+      rgba(15, 24, 44, 0.72) 0%,
+      rgba(10, 17, 34, 0.66) 100%
     );
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
-    border: 1px solid rgba(203, 213, 225, 0.18);
+    border: 1px solid var(--mc-border-primary);
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.18),
-      inset 1px 0 0 rgba(255, 255, 255, 0.06),
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      inset 1px 0 0 rgba(255, 255, 255, 0.05),
       0 18px 42px rgba(2, 6, 23, 0.52);
   }
 
+  .mc-panel,
+  .chronyx-glass {
+    background: rgba(12, 20, 38, 0.62);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid var(--mc-border-subtle);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 8px 24px rgba(2, 6, 23, 0.34);
+  }
+
+  .mc-well,
   .chronyx-glass-subtle {
-    background: rgba(7, 12, 24, 0.58);
+    background: rgba(6, 11, 22, 0.68);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border: 1px solid rgba(203, 213, 225, 0.09);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   }
 
+  .mc-ticks,
   .chronyx-corner-ticks {
     background-image:
       linear-gradient(to right, rgba(203, 213, 225, 0.22) 7px, transparent 7px),
@@ -118,15 +128,18 @@ body {
     background-repeat: no-repeat;
   }
 
+  .mc-live-dot,
   .chronyx-live-dot {
-    animation: chronyxLiveHeartbeat 3.2s ease-in-out infinite;
+    animation: mcLiveHeartbeat 3.2s ease-in-out infinite;
   }
 
+  .mc-live-surface,
   .chronyx-live-surface {
     position: relative;
     overflow: hidden;
   }
 
+  .mc-live-surface::after,
   .chronyx-live-surface::after {
     content: '';
     position: absolute;
@@ -137,11 +150,20 @@ body {
     background: linear-gradient(90deg, transparent, rgba(165, 243, 252, 0.55), transparent);
     opacity: 0.35;
     pointer-events: none;
-    animation: chronyxLiveSheen 10s linear infinite;
+    animation: mcLiveSheen 10s linear infinite;
   }
 
+  .mc-star-layer-1 {
+    animation: mcStarDrift 65s linear infinite;
+  }
+
+  .mc-star-layer-2 {
+    animation: mcStarDrift 115s linear infinite;
+  }
+
+  .mc-input,
   .chronyx-input {
-    background: rgba(6, 11, 22, 0.7);
+    background: rgba(6, 11, 22, 0.72);
     border: 1px solid rgba(203, 213, 225, 0.14);
     color: #e8eeff;
     box-shadow: inset 0 1px 2px rgba(2, 6, 23, 0.45);
@@ -151,6 +173,7 @@ body {
       background-color 180ms ease-out;
   }
 
+  .mc-input:focus,
   .chronyx-input:focus {
     outline: none;
     border-color: rgba(61, 214, 245, 0.55);
@@ -161,8 +184,12 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .mc-live-dot,
   .chronyx-live-dot,
-  .chronyx-live-surface::after {
+  .mc-live-surface::after,
+  .chronyx-live-surface::after,
+  .mc-star-layer-1,
+  .mc-star-layer-2 {
     animation: none !important;
   }
 

@@ -23,7 +23,7 @@ export const Card: React.FC<CardProps> = ({
     <div
       data-testid={dataTestId}
       onClick={onClick}
-      className={`chronyx-glass rounded-xl ${
+      className={`mc-panel rounded-[10px] ${
         onClick
           ? 'cursor-pointer transition-[border-color,transform,box-shadow] duration-[180ms] ease-out hover:-translate-y-[1px] hover:border-accent-cyan/35 hover:shadow-[inset_0_1px_0_rgba(165,243,252,0.18),0_14px_32px_rgba(2,6,23,0.46)] active:translate-y-0'
           : ''

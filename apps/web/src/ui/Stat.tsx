@@ -31,7 +31,7 @@ export const Stat: React.FC<StatProps> = ({
   return (
     <div
       data-testid={dataTestId}
-      className={`chronyx-glass p-4 rounded-xl space-y-2 ${className}`}
+      className={`mc-panel p-4 rounded-[10px] space-y-2 ${className}`}
     >
       <div className="flex items-center justify-between pb-1.5 border-b border-white/[0.07]">
         <span className="text-xs text-muted font-medium tracking-tight flex items-center gap-1">

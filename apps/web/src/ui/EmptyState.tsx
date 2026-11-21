@@ -17,7 +17,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 }) => {
   return (
     <div
-      className={`chronyx-glass-subtle flex flex-col items-center justify-center p-8 text-center rounded-xl border border-white/[0.12] space-y-3 ${className}`}
+      className={`mc-well flex flex-col items-center justify-center p-8 text-center rounded-[10px] border border-white/[0.11] space-y-3 ${className}`}
     >
       {icon && <div className="text-3xl text-muted/60">{icon}</div>}
       <div className="space-y-1">

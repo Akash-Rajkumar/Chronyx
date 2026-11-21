@@ -24,10 +24,17 @@ export const Sparkline: React.FC<SparklineProps> = ({
       <svg
         width={width}
         height={height}
-        className={`text-muted/30 ${className}`}
+        className={`text-white/20 ${className}`}
         aria-hidden="true"
       >
-        <line x1="0" y1={height / 2} x2={width} y2={height / 2} stroke="currentColor" strokeDasharray="2,2" />
+        <line
+          x1="0"
+          y1={height / 2}
+          x2={width}
+          y2={height / 2}
+          stroke="currentColor"
+          strokeDasharray="2,3"
+        />
       </svg>
     );
   }
@@ -54,6 +61,14 @@ export const Sparkline: React.FC<SparklineProps> = ({
       className={`overflow-visible ${className}`}
       aria-hidden="true"
     >
+      <line
+        x1="0"
+        y1={height / 2}
+        x2={width}
+        y2={height / 2}
+        stroke="rgba(255,255,255,0.08)"
+        strokeDasharray="2,2"
+      />
       {fillColor && <path d={areaPath} fill={fillColor} />}
       <polyline
         fill="none"
