@@ -5,12 +5,18 @@ import { Server as SocketIOServer } from 'socket.io';
 import { createEngine } from '@chronyx/engine';
 import { createSim } from '@chronyx/sim';
 import { createCoreRoutes } from './core/routes.js';
+import { setupGateway } from './core/gateway.js';
+import { NodeRegistry } from './core/nodeRegistry.js';
+import { HeartbeatService } from './core/heartbeatService.js';
 import { registerLabRoutes } from './lab/index.js';
 import { apiErrorMiddleware } from './middleware/error.js';
 import { getRepositories } from './core/db/index.js';
 import type { LabContext, IFaultService } from './ctx.js';
 
-export function createServer() {
+export function createServer(options?: {
+  nodeRegistry?: NodeRegistry;
+  heartbeatService?: HeartbeatService;
+}) {
   const app = express();
   const server = http.createServer(app);
 
@@ -32,8 +38,15 @@ export function createServer() {
     },
   });
 
+  // Core Gateway services
+  const nodeRegistry = options?.nodeRegistry ?? new NodeRegistry();
+  const heartbeatService = options?.heartbeatService ?? new HeartbeatService(nodeRegistry);
+
+  // Mount Socket.IO Node Gateway (Part E2c)
+  setupGateway(io, nodeRegistry, heartbeatService);
+
   // Mount Core Routes
-  app.use(createCoreRoutes());
+  app.use(createCoreRoutes(nodeRegistry, heartbeatService));
 
   // Setup Lab Context seam
   const engine = createEngine();
@@ -72,7 +85,7 @@ export function createServer() {
 
   const labContext: LabContext = {
     now: () => Date.now(),
-    hubNow: () => performance.now(),
+    hubNow: () => performance.timeOrigin + performance.now(),
     engine,
     sim,
     faults: faultServiceStub,
@@ -80,7 +93,7 @@ export function createServer() {
     emit: (event, payload) => io.to('dashboard').emit(event, payload),
     sendToNode: (_node_id, _event, _payload) => {},
     getAssessments: () => [],
-    getNodes: () => [],
+    getNodes: () => nodeRegistry.getAllNodes(),
     getBaselineInputs: () => [],
   };
 
@@ -97,5 +110,5 @@ export function createServer() {
   // Error handling middleware
   app.use(apiErrorMiddleware);
 
-  return { app, server, io };
+  return { app, server, io, nodeRegistry, heartbeatService };
 }
