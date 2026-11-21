@@ -1,6 +1,12 @@
 import * as ed from '@noble/ed25519';
 import { sha256 } from '@noble/hashes/sha256';
+import { sha512 } from '@noble/hashes/sha512';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils';
+
+// Configure pure-JS SHA-512 explicitly for @noble/ed25519 to avoid crypto.subtle dependency (D-001)
+const sha512Sync = (...m: Uint8Array[]) => sha512(ed.etc.concatBytes(...m));
+ed.etc.sha512Sync = sha512Sync;
+ed.etc.sha512Async = (...m: Uint8Array[]) => Promise.resolve(sha512Sync(...m));
 
 export function utf8ToBytes(str: string): Uint8Array {
   return new TextEncoder().encode(str);

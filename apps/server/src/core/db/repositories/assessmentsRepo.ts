@@ -31,5 +31,16 @@ export class AssessmentsRepository {
     }
     return data || [];
   }
+
+  async clearAll(): Promise<void> {
+    const { error } = await this.client
+      .from('assessments')
+      .delete()
+      .gte('id', 0);
+
+    if (error) {
+      throw new Error(`Failed to clear assessments: ${error.message}`);
+    }
+  }
 }
 

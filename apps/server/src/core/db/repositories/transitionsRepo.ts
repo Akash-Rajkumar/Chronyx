@@ -31,5 +31,16 @@ export class TransitionsRepository {
     }
     return data || [];
   }
+
+  async clearAll(): Promise<void> {
+    const { error } = await this.client
+      .from('transitions')
+      .delete()
+      .gte('id', 0);
+
+    if (error) {
+      throw new Error(`Failed to clear transitions: ${error.message}`);
+    }
+  }
 }
 
