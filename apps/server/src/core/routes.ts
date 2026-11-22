@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import {
   CONTRACT_VERSION,
   ROUTES,
@@ -9,6 +10,7 @@ import {
   PatchConfigReqSchema,
   ObservationCreateSchema,
   ObservationSchema,
+  PassportSchema,
 } from '@chronyx/contracts';
 import type {
   HistoryPoint,
@@ -19,9 +21,12 @@ import type {
   SuspectedCause,
   Observation,
   ObservationStatus,
+  Passport,
   TrustState,
   UUID,
 } from '@chronyx/contracts';
+import { sha256hex, canonicalJson, signHash } from '@chronyx/crypto';
+import { getServerKeyPair } from './serverKey.js';
 import { isDbConfigured } from './db/index.js';
 import { NodeRegistry } from './nodeRegistry.js';
 import { HeartbeatService } from './heartbeatService.js';
@@ -356,6 +361,89 @@ export function createCoreRoutes(
       };
 
       res.status(201).json(ObservationSchema.parse(response));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // GET /api/v1/observations/:id/passport (Part E2b / Part G4.9)
+  router.get('/api/v1/observations/:id/passport', async (req, res, next) => {
+    try {
+      const observationId = req.params.id;
+      const uuidCheck = z.string().uuid().safeParse(observationId);
+      if (!uuidCheck.success) {
+        throw new AppError('BAD_REQUEST', `Invalid observation ID: ${observationId}`, 400);
+      }
+
+      if (!db) {
+        throw new AppError('INTERNAL', 'Database persistence is not configured or unavailable', 500);
+      }
+
+      const observation = await db.observations.findById(observationId as UUID);
+      if (!observation) {
+        throw new AppError('NOT_FOUND', `Observation ${observationId} not found`, 404);
+      }
+
+      const assessment = orchestrator?.getLatestAssessment(observation.node_id);
+      const chain_head_hash = nodeRegistry.getLastVerifiedHash(observation.node_id);
+
+      const error_est_ms = assessment?.error_est_ms ?? 0;
+      const corrected_time_ms = Number((observation.observed_at_ms - error_est_ms).toFixed(2));
+      const sigma_ms =
+        assessment?.sigma_ms && assessment.sigma_ms > 0
+          ? Number(assessment.sigma_ms.toFixed(2))
+          : 0.1;
+      const confidence = assessment?.confidence ?? observation.confidence;
+      const state_at_observation: TrustState =
+        observation.state_at_ingest ?? assessment?.state ?? 'trusted';
+
+      const evidencePayload = {
+        observation_id: observation.id,
+        node_id: observation.node_id,
+        kind: observation.kind,
+        observed_at_ms: observation.observed_at_ms,
+        payload: observation.payload,
+      };
+      const evidence_hash = sha256hex(canonicalJson(evidencePayload));
+      const issued_at_ms = Date.now();
+
+      const serverKeys = await getServerKeyPair();
+      const server_public_key = serverKeys.publicKeyBase64;
+
+      const passportDataToSign = {
+        observation_id: observation.id,
+        node_id: observation.node_id,
+        observed_at_ms: observation.observed_at_ms,
+        corrected_time_ms,
+        error_est_ms,
+        sigma_ms,
+        confidence,
+        state_at_observation,
+        evidence_hash,
+        chain_head_hash,
+        issued_at_ms,
+        server_public_key,
+      };
+      const certHash = sha256hex(canonicalJson(passportDataToSign));
+      const sig = await signHash(certHash, serverKeys.privateKey);
+
+      const passport: Passport = {
+        observation_id: observation.id,
+        node_id: observation.node_id,
+        observed_at_ms: observation.observed_at_ms,
+        corrected_time_ms,
+        error_est_ms,
+        sigma_ms,
+        confidence,
+        state_at_observation,
+        evidence_hash,
+        chain_head_hash,
+        issued_at_ms,
+        server_public_key,
+        sig,
+      };
+
+      res.json(PassportSchema.parse(passport));
     } catch (err) {
       next(err);
     }

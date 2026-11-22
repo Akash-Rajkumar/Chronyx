@@ -4,6 +4,7 @@ import { ConnectionBanner } from '../ui/ConnectionBanner.js';
 import { JoinQrModal } from '../ui/JoinQrModal.js';
 import { initDashboardSocket } from '../api/socket.js';
 import { openQrModal, closeQrModal } from '../state/useQrModalStore.js';
+import { PresenterOverlay } from '../present/index.js';
 
 export { openQrModal, closeQrModal };
 
@@ -14,7 +15,7 @@ export interface AppShellProps {
 
 export const AppShell: React.FC<AppShellProps> = ({
   children,
-  showPassport = false,
+  showPassport = true,
 }) => {
   useEffect(() => {
     const cleanup = initDashboardSocket();
@@ -25,6 +26,7 @@ export const AppShell: React.FC<AppShellProps> = ({
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground">
       <Sidebar showPassport={showPassport} onOpenQrModal={openQrModal} />
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <PresenterOverlay onOpenQrModal={openQrModal} />
         <ConnectionBanner />
         <main className="flex-1 overflow-auto bg-background p-6">
           {children}
