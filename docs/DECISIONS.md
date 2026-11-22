@@ -44,3 +44,9 @@
   - All database tables and migrations.
   - All other frozen interfaces and ownership boundaries.
 
+## D-002: V1 Contract Version Compatibility (`1.0.x`)
+- Async simulation and crypto change belongs to Persons 1 and 2.
+- V1 accepts `1.0.x`.
+- `CONTRACT_VERSION` is now `1.0.1`.
+- No route, event, or table changes.
+
