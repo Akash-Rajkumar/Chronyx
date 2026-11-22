@@ -14,6 +14,7 @@ export function isEditableTarget(target: EventTarget | null): boolean {
 export interface UsePresenterShortcutsOptions {
   isPresent: boolean;
   onTogglePresent: () => void;
+  onExitPresent?: () => void;
   onScenario: (name: DemoScenarioName) => void;
   onOpenQr?: () => void;
   onNextCue: () => void;
@@ -54,6 +55,7 @@ export function usePresenterMode() {
 /**
  * Registers global Presenter keyboard shortcuts (Part G4.10):
  * - P: toggle Presenter mode
+ * - Escape: exit Presenter mode when no modal dialog is open
  * - 1: Jump, 2: Slow drag, 3: GNSS spoof, 0: Calm
  * - Q: open shared QR modal (when callback provided), N: next cue
  * Ignores keystrokes inside inputs, textareas, selects, contenteditable elements, and dialogs.
@@ -61,6 +63,7 @@ export function usePresenterMode() {
 export function usePresenterShortcuts({
   isPresent,
   onTogglePresent,
+  onExitPresent,
   onScenario,
   onOpenQr,
   onNextCue,
@@ -69,6 +72,7 @@ export function usePresenterShortcuts({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (isEditableTarget(e.target)) return;
+      if (typeof document !== 'undefined' && document.querySelector('[role="dialog"]')) return;
 
       const key = e.key.toLowerCase();
 
@@ -107,10 +111,14 @@ export function usePresenterShortcuts({
           e.preventDefault();
           onNextCue();
           break;
+        case 'escape':
+          e.preventDefault();
+          (onExitPresent ?? onTogglePresent)();
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isPresent, onTogglePresent, onScenario, onOpenQr, onNextCue]);
+  }, [isPresent, onTogglePresent, onExitPresent, onScenario, onOpenQr, onNextCue]);
 }
