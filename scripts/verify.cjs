@@ -33,10 +33,10 @@ function makeStubFailure(id, name, reason) {
   };
 }
 
-function timedStep(id, name, fn) {
+async function timedStep(id, name, fn) {
   const start = Date.now();
   try {
-    const res = fn();
+    const res = await fn();
     return {
       id,
       name,
@@ -67,12 +67,61 @@ function stepV0Check() {
 }
 
 // V1: Boot (migrations applied, /health reports db: 'up', contract_version 1.0.x)
-function stepV1Boot() {
-  return makeStubFailure(
-    'V1',
-    'Boot (/health, migrations, contract_version)',
-    'Requires live server & Supabase test schema (P1-T2/P1-T4)',
-  );
+function isV1CompatibleContractVersion(contractVersion) {
+  return typeof contractVersion === 'string' && /^1\.0\.(?:0|[1-9]\d*)$/.test(contractVersion);
+}
+
+function healthUrlFromBaseUrl(baseUrl) {
+  return new URL('/api/v1/health', baseUrl).toString();
+}
+
+function evaluateV1HealthPayload(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return { ok: false, detail: 'Health response was not a JSON object' };
+  }
+  if (payload.ok !== true) {
+    return { ok: false, detail: 'Health response did not report ok: true' };
+  }
+  if (payload.db !== 'up') {
+    return { ok: false, detail: `Health response reported db: ${String(payload.db)} (expected up)` };
+  }
+  if (!isV1CompatibleContractVersion(payload.contract_version)) {
+    return {
+      ok: false,
+      detail: `Unsupported contract_version ${JSON.stringify(payload.contract_version)} (expected 1.0.x)`,
+    };
+  }
+  return {
+    ok: true,
+    detail: `Health reports db: up and contract_version ${payload.contract_version} (accepted 1.0.x)`,
+  };
+}
+
+async function stepV1Boot() {
+  return timedStep('V1', 'Boot (/health, migrations, contract_version)', async () => {
+    const configuredBaseUrl =
+      typeof process.env.CHRONYX_VERIFY_BASE_URL === 'string'
+        ? process.env.CHRONYX_VERIFY_BASE_URL.trim()
+        : '';
+    const baseUrl = configuredBaseUrl || 'http://localhost:3001';
+    const healthUrl = healthUrlFromBaseUrl(baseUrl);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5_000);
+
+    try {
+      const response = await fetch(healthUrl, { signal: controller.signal });
+      if (!response.ok) {
+        return { ok: false, detail: `GET ${healthUrl} returned HTTP ${response.status}` };
+      }
+      const payload = await response.json();
+      return evaluateV1HealthPayload(payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { ok: false, detail: `GET ${healthUrl} failed: ${message}` };
+    } finally {
+      clearTimeout(timeout);
+    }
+  });
 }
 
 // V2: Clean run (3 virtual + 2 headless agents for 5 min, 0 transitions/incidents)
@@ -311,7 +360,7 @@ ${rows}
 `;
 }
 
-function main() {
+async function main() {
   console.info('=== Chronyx Verification Runner (Part I2) ===');
 
   const steps = [
@@ -335,7 +384,7 @@ function main() {
 
   const results = [];
   for (const stepFn of steps) {
-    const res = stepFn();
+    const res = await stepFn();
     results.push(res);
     console.info(`[${res.status}] ${res.id} (${res.name}): ${res.detail}`);
   }
@@ -353,4 +402,16 @@ function main() {
   }
 }
 
-main();
+module.exports = {
+  evaluateV1HealthPayload,
+  healthUrlFromBaseUrl,
+  isV1CompatibleContractVersion,
+  stepV1Boot,
+};
+
+if (require.main === module) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.stack : String(error));
+    process.exit(1);
+  });
+}
