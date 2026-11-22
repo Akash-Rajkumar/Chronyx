@@ -15,8 +15,14 @@ import type {
   NodeInfo,
   AnchorInfo,
 } from '@chronyx/contracts';
-import { useDashboardStore } from '../state/useDashboardStore.js';
+import {
+  useDashboardStore,
+  type ServerAssessmentsPayload,
+  type AssessmentsEventPayload,
+} from '../state/useDashboardStore.js';
 import { api } from './client.js';
+
+export type { ServerAssessmentsPayload, AssessmentsEventPayload };
 
 let socket: Socket | null = null;
 let subscribersCount = 0;
@@ -119,6 +125,8 @@ export function initDashboardSocket(): () => void {
     useDashboardStore.getState().setSnapshot(snapshot);
   });
 
+  // Part E2c: The server emits { t_ms, assessments, network, baseline } on 1 Hz ticker.
+  // We accept unknown from the Socket.IO transport and normalize defensively at the store boundary.
   socket.on(SOCKET_EVENTS.ASSESSMENTS, (payload: unknown) => {
     useDashboardStore.getState().applyAssessments(payload);
   });

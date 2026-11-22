@@ -73,6 +73,16 @@ const initialState = {
   error: null as string | null,
 };
 
+export interface ServerAssessmentsPayload {
+  t_ms?: number;
+  server_time_ms?: number;
+  assessments?: Assessment[];
+  network?: NetworkHealth;
+  baseline?: BaselineState;
+}
+
+export type AssessmentsEventPayload = ServerAssessmentsPayload | Assessment[];
+
 export interface NormalizedAssessmentsPayload {
   assessments: Assessment[];
   network?: NetworkHealth;
@@ -81,8 +91,47 @@ export interface NormalizedAssessmentsPayload {
 }
 
 /**
+ * Sanitizes slightly loose assessment records into contract-compliant Assessment objects.
+ * Populates contract defaults for omitted nullable/array fields and validates with AssessmentSchema.
+ */
+function sanitizeAssessment(raw: Record<string, unknown>, fallbackTimeMs?: number): Assessment | null {
+  if (
+    typeof raw.node_id !== 'string' ||
+    typeof raw.error_est_ms !== 'number' ||
+    typeof raw.state !== 'string'
+  ) {
+    return null;
+  }
+
+  const validStates = ['trusted', 'suspect', 'quarantined', 'recovering'];
+  const state = validStates.includes(raw.state) ? (raw.state as Assessment['state']) : 'suspect';
+
+  const sanitized = {
+    node_id: raw.node_id,
+    t_ms: typeof raw.t_ms === 'number' && Number.isFinite(raw.t_ms) ? raw.t_ms : (fallbackTimeMs ?? Date.now()),
+    state,
+    error_est_ms: raw.error_est_ms,
+    sigma_ms: typeof raw.sigma_ms === 'number' && Number.isFinite(raw.sigma_ms) ? raw.sigma_ms : 0.1,
+    z: typeof raw.z === 'number' && Number.isFinite(raw.z) ? raw.z : 0,
+    cusum: typeof raw.cusum === 'number' && Number.isFinite(raw.cusum) ? raw.cusum : 0,
+    confidence: typeof raw.confidence === 'number' && Number.isFinite(raw.confidence)
+      ? Math.max(0, Math.min(1, raw.confidence))
+      : 1,
+    streams: Array.isArray(raw.streams) ? raw.streams : [],
+    reasons: Array.isArray(raw.reasons) ? raw.reasons : [],
+    suspected_cause: typeof raw.suspected_cause === 'string' ? raw.suspected_cause : 'none',
+    quarantined_since_ms: typeof raw.quarantined_since_ms === 'number' && Number.isFinite(raw.quarantined_since_ms)
+      ? raw.quarantined_since_ms
+      : null,
+  };
+
+  const parsed = AssessmentSchema.safeParse(sanitized);
+  return parsed.success ? parsed.data : null;
+}
+
+/**
  * Defensively normalizes incoming socket assessments payload.
- * Supports both array-shaped (Assessment[]) and object-shaped payloads
+ * Supports both array-shaped (Assessment[]) and server object-shaped payloads
  * ({ assessments?: Assessment[]; network?: NetworkHealth; baseline?: BaselineState; t_ms?: number }).
  * Safely filters out malformed items and returns null for invalid payloads.
  */
@@ -98,6 +147,11 @@ export function normalizeAssessmentsPayload(raw: unknown): NormalizedAssessments
       const parsed = AssessmentSchema.safeParse(item);
       if (parsed.success) {
         validAssessments.push(parsed.data);
+      } else if (item && typeof item === 'object') {
+        const sanitized = sanitizeAssessment(item as Record<string, unknown>);
+        if (sanitized) {
+          validAssessments.push(sanitized);
+        }
       }
     }
     if (validAssessments.length === 0 && raw.length > 0) {
@@ -106,10 +160,18 @@ export function normalizeAssessmentsPayload(raw: unknown): NormalizedAssessments
     return { assessments: validAssessments };
   }
 
-  // Case 2: Object-shaped payload
+  // Case 2: Object-shaped server payload: { t_ms, assessments, network, baseline }
   const obj = raw as Record<string, unknown>;
   const validAssessments: Assessment[] = [];
   let foundRecognizedField = false;
+
+  // Extract server time if present (t_ms or server_time_ms)
+  let serverTimeMs: number | undefined = undefined;
+  const rawTime = obj.t_ms ?? obj.server_time_ms;
+  if (typeof rawTime === 'number' && Number.isFinite(rawTime) && rawTime > 0) {
+    foundRecognizedField = true;
+    serverTimeMs = rawTime;
+  }
 
   // Extract assessments if present
   if ('assessments' in obj && obj.assessments !== null && obj.assessments !== undefined) {
@@ -120,6 +182,11 @@ export function normalizeAssessmentsPayload(raw: unknown): NormalizedAssessments
         const parsed = AssessmentSchema.safeParse(item);
         if (parsed.success) {
           validAssessments.push(parsed.data);
+        } else if (item && typeof item === 'object') {
+          const sanitized = sanitizeAssessment(item as Record<string, unknown>, serverTimeMs);
+          if (sanitized) {
+            validAssessments.push(sanitized);
+          }
         }
       }
     } else if (typeof rawAssessments === 'object') {
@@ -127,6 +194,11 @@ export function normalizeAssessmentsPayload(raw: unknown): NormalizedAssessments
         const parsed = AssessmentSchema.safeParse(item);
         if (parsed.success) {
           validAssessments.push(parsed.data);
+        } else if (item && typeof item === 'object') {
+          const sanitized = sanitizeAssessment(item as Record<string, unknown>, serverTimeMs);
+          if (sanitized) {
+            validAssessments.push(sanitized);
+          }
         }
       }
     }
@@ -139,6 +211,20 @@ export function normalizeAssessmentsPayload(raw: unknown): NormalizedAssessments
     const parsedNet = NetworkHealthSchema.safeParse(obj.network);
     if (parsedNet.success) {
       network = parsedNet.data;
+    } else if (typeof obj.network === 'object' && obj.network !== null) {
+      const net = obj.network as Record<string, unknown>;
+      if (typeof net.score === 'number' && Number.isFinite(net.score)) {
+        network = {
+          score: Math.max(0, Math.min(100, Math.round(net.score))),
+          n: typeof net.n === 'number' ? Math.max(0, Math.round(net.n)) : 0,
+          trusted: typeof net.trusted === 'number' ? Math.max(0, Math.round(net.trusted)) : 0,
+          suspect: typeof net.suspect === 'number' ? Math.max(0, Math.round(net.suspect)) : 0,
+          quarantined: typeof net.quarantined === 'number' ? Math.max(0, Math.round(net.quarantined)) : 0,
+          recovering: typeof net.recovering === 'number' ? Math.max(0, Math.round(net.recovering)) : 0,
+          fault_tolerance_f: typeof net.fault_tolerance_f === 'number' ? Math.max(0, Math.round(net.fault_tolerance_f)) : 0,
+          anchor_ok: Boolean(net.anchor_ok),
+        };
+      }
     }
   }
 
@@ -149,15 +235,17 @@ export function normalizeAssessmentsPayload(raw: unknown): NormalizedAssessments
     const parsedBase = BaselineStateSchema.safeParse(obj.baseline);
     if (parsedBase.success) {
       baseline = parsedBase.data;
+    } else if (typeof obj.baseline === 'object' && obj.baseline !== null) {
+      const base = obj.baseline as Record<string, unknown>;
+      if (typeof base.source === 'string' && typeof base.label === 'string') {
+        baseline = {
+          source: base.source === 'chrony' ? 'chrony' : 'model',
+          label: String(base.label),
+          per_node: Array.isArray(base.per_node) ? (base.per_node as BaselineState['per_node']) : [],
+          cluster_time_error_ms: typeof base.cluster_time_error_ms === 'number' ? base.cluster_time_error_ms : 0,
+        };
+      }
     }
-  }
-
-  // Extract server time if present
-  let serverTimeMs: number | undefined = undefined;
-  const rawTime = obj.t_ms ?? obj.server_time_ms;
-  if (typeof rawTime === 'number' && Number.isFinite(rawTime) && rawTime > 0) {
-    foundRecognizedField = true;
-    serverTimeMs = rawTime;
   }
 
   if (!foundRecognizedField) {
@@ -240,6 +328,7 @@ export const useDashboardStore = create<DashboardState>((set) => ({
         baseline: normalized.baseline !== undefined ? normalized.baseline : state.baseline,
         serverTimeMs: normalized.serverTimeMs !== undefined ? normalized.serverTimeMs : state.serverTimeMs,
         lastSeenMs: Date.now(),
+        isLoading: false,
       };
     });
   },
@@ -356,3 +445,5 @@ export const useEngineConfig = () => useDashboardStore((s) => s.config);
 export const useIsLoading = () => useDashboardStore((s) => s.isLoading);
 export const useStoreError = () => useDashboardStore((s) => s.error);
 export const useLastSeenMs = () => useDashboardStore((s) => s.lastSeenMs);
+export const useBaselineState = () => useDashboardStore((s) => s.baseline);
+export const useServerTimeMs = () => useDashboardStore((s) => s.serverTimeMs);
