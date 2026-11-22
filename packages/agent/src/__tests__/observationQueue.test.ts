@@ -293,4 +293,43 @@ describe('P3-T8 Bounded Observation Queue & Lifecycle (Requirements 13-25)', () 
     expect(queue.getPendingIds().length).toBe(1);
     expect(queue.size()).toBe(1);
   });
+
+  // Strict FIFO dispatch and error-halt preservation
+  it('strictly processes observations in FIFO order and halts on error to preserve remaining order', async () => {
+    queue.enqueue({ node_id: mockNodeId, kind: 'generic', local_timestamp_ms: 100, customId: 'item-1' });
+    queue.enqueue({ node_id: mockNodeId, kind: 'generic', local_timestamp_ms: 200, customId: 'item-2' });
+    queue.enqueue({ node_id: mockNodeId, kind: 'generic', local_timestamp_ms: 300, customId: 'item-3' });
+
+    const submitted: string[] = [];
+    const mockSubmit = vi.fn(async (payload: ObservationCreate): Promise<Observation> => {
+      const id = payload.payload.client_observation_id as string;
+      if (id === 'item-2') {
+        throw new Error('Temporary submission failure on item-2');
+      }
+      submitted.push(id);
+      return {
+        id: 'obs-' + id,
+        node_id: payload.node_id,
+        kind: payload.kind,
+        observed_at_ms: payload.observed_at_ms,
+        payload: payload.payload,
+        status: 'accepted',
+        confidence: 1.0,
+        state_at_ingest: 'trusted',
+        created_at: new Date().toISOString(),
+      };
+    });
+
+    const res = await queue.flush(0, mockSubmit);
+
+    // item-1 succeeded and was removed
+    expect(res.submittedCount).toBe(1);
+    expect(res.submittedIds).toEqual(['item-1']);
+    expect(submitted).toEqual(['item-1']);
+
+    // item-2 failed, flush halted, preserving item-2 and item-3 in exact FIFO order
+    expect(res.failedCount).toBe(1);
+    expect(queue.size()).toBe(2);
+    expect(queue.getPendingIds()).toEqual(['item-2', 'item-3']);
+  });
 });

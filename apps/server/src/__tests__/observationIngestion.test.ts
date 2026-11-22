@@ -441,4 +441,32 @@ describe('P1-T9-C Observation Ingestion Route Suite (POST /api/v1/observations)'
     expect(res.body.state_at_ingest).toBe('recovering');
     expect(res.body.confidence).toBe(0.82);
   });
+
+  // 7. Security boundary enforcement (D-003): node registration validated, no HTTP signature required
+  it('7. Enforces node registration and schema validation on REST without requiring HTTP Ed25519 signature headers (demo boundary)', async () => {
+    // Valid registered node submitting without any Auth or signature headers
+    const payload: ObservationCreate = {
+      node_id: testNodeId,
+      kind: 'occultation_timing',
+      observed_at_ms: 1795296680000,
+      payload: {
+        raw_measurement: 42.1,
+      },
+    };
+
+    const res = await request(app)
+      .post(ROUTES.OBSERVATIONS)
+      .send(payload)
+      .expect(201);
+
+    expect(res.body.node_id).toBe(testNodeId);
+    expect(res.body.status).toBe('held'); // unassessed node defaults to held per zero-trust policy
+
+    // Unregistered node UUID is rejected with 404 NOT_FOUND
+    const unregisteredNodeId = 'e0000000-0000-4000-8000-000000000099' as UUID;
+    await request(app)
+      .post(ROUTES.OBSERVATIONS)
+      .send({ ...payload, node_id: unregisteredNodeId })
+      .expect(404);
+  });
 });
