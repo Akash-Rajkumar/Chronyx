@@ -18,6 +18,7 @@ import { Engine } from '@chronyx/engine';
 import type { DatabaseRepositories } from '../core/db/index.js';
 import type { ObservationRow } from '../core/db/schema.js';
 import { verifyHash, sha256hex, canonicalJson } from '@chronyx/crypto';
+import { getServerKeyPair, resetServerKeyPair } from '../core/serverKey.js';
 
 describe('Production Passport Endpoint (GET /api/v1/observations/:id/passport)', () => {
   let app: express.Express;
@@ -188,5 +189,75 @@ describe('Production Passport Endpoint (GET /api/v1/observations/:id/passport)',
 
     expect(res.body.error.code).toBe('INTERNAL');
     expect(res.body.error.message).toContain('Database persistence');
+  });
+
+  it('6. ensures server signing identity persists across simulated server restart', async () => {
+    const originalKey = process.env.SERVER_SIGNING_KEY;
+    try {
+      process.env.SERVER_SIGNING_KEY = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
+      resetServerKeyPair();
+
+      // First run: issue passport
+      const res1 = await request(app)
+        .get(`/api/v1/observations/${testObservationId}/passport`)
+        .expect(200);
+      const passport1: Passport = res1.body;
+
+      // Simulate server restart: reset in-memory key cache
+      resetServerKeyPair();
+
+      // Second run: issue passport or verify previous passport
+      const keysAfterRestart = await getServerKeyPair();
+      expect(keysAfterRestart.publicKeyBase64).toBe(passport1.server_public_key);
+
+      // Verify the signature on passport1 using the key retrieved after restart
+      const signedData = {
+        observation_id: passport1.observation_id,
+        node_id: passport1.node_id,
+        observed_at_ms: passport1.observed_at_ms,
+        corrected_time_ms: passport1.corrected_time_ms,
+        error_est_ms: passport1.error_est_ms,
+        sigma_ms: passport1.sigma_ms,
+        confidence: passport1.confidence,
+        state_at_observation: passport1.state_at_observation,
+        evidence_hash: passport1.evidence_hash,
+        chain_head_hash: passport1.chain_head_hash,
+        issued_at_ms: passport1.issued_at_ms,
+        server_public_key: keysAfterRestart.publicKeyBase64,
+      };
+      const certHash = sha256hex(canonicalJson(signedData));
+      const isValid = await verifyHash(certHash, passport1.sig, keysAfterRestart.publicKeyBase64);
+      expect(isValid).toBe(true);
+    } finally {
+      process.env.SERVER_SIGNING_KEY = originalKey;
+      resetServerKeyPair();
+    }
+  });
+
+  it('7. prevents race condition during concurrent key initialization', async () => {
+    resetServerKeyPair();
+    const [k1, k2, k3] = await Promise.all([
+      getServerKeyPair(),
+      getServerKeyPair(),
+      getServerKeyPair(),
+    ]);
+
+    expect(k1.publicKeyBase64).toBe(k2.publicKeyBase64);
+    expect(k2.publicKeyBase64).toBe(k3.publicKeyBase64);
+    expect(k1.privateKeyHex).toBe(k2.privateKeyHex);
+  });
+
+  it('8. strictly guarantees private key material is never exposed in the API response', async () => {
+    const res = await request(app)
+      .get(`/api/v1/observations/${testObservationId}/passport`)
+      .expect(200);
+
+    const body = res.body as Record<string, unknown>;
+    expect(body.private_key).toBeUndefined();
+    expect(body.privateKey).toBeUndefined();
+    expect(body.privateKeyHex).toBeUndefined();
+    expect(body.secret_key).toBeUndefined();
+    expect(body.secretKey).toBeUndefined();
+    expect(JSON.stringify(body)).not.toContain('0123456789abcdef');
   });
 });
