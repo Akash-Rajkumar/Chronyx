@@ -45,18 +45,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       className={`w-64 border-r border-border bg-card/40 flex flex-col justify-between p-4 shrink-0 h-full ${className}`}
     >
       <div className="space-y-6">
-        <div className="flex items-center gap-3 px-2">
-          <div className="h-8 w-8 rounded-lg bg-accent-cyan/10 border border-accent-cyan/30 flex items-center justify-center font-bold text-accent-cyan">
+        <NavLink to="/" title="Chronyx Landing Page" className="flex items-center gap-3 px-2 group hover:opacity-90 transition-opacity">
+          <div className="h-8 w-8 rounded-lg bg-accent-cyan/10 border border-accent-cyan/30 flex items-center justify-center font-bold text-accent-cyan group-hover:scale-105 transition-transform">
             C
           </div>
           <div>
             <h1 className="font-semibold text-base tracking-tight text-foreground">Chronyx</h1>
             <p className="text-xs text-muted">Timing Verification</p>
           </div>
-        </div>
+        </NavLink>
 
         <nav className="flex flex-col gap-1">
-          <NavLink to="/" end className={navLinkClass}>
+          <NavLink to="/overview" end className={navLinkClass}>
             Overview
           </NavLink>
           <NavLink to="/compare" className={navLinkClass}>

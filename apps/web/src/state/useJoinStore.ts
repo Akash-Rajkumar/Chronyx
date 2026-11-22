@@ -62,6 +62,9 @@ export const useJoinStore = create<JoinStoreState>((set, get) => ({
 
   setNodeName: (name: string) => {
     set({ nodeName: name });
+    if (agentInstance && name.trim()) {
+      agentInstance.setNodeName(name);
+    }
   },
 
   syncFromAgent: (agentState: NodeAgentState) => {
@@ -113,6 +116,7 @@ export const useJoinStore = create<JoinStoreState>((set, get) => ({
 
   connect: async () => {
     const { nodeName, syncFromAgent } = get();
+    const effectiveName = nodeName.trim() || 'Judge-Node';
 
     if (!agentInstance) {
       const baseUrl = getApiBaseUrl();
@@ -121,13 +125,15 @@ export const useJoinStore = create<JoinStoreState>((set, get) => ({
       agentInstance = new NodeAgent({
         baseUrl,
         wsUrl,
-        nodeName,
+        nodeName: effectiveName,
       });
 
       unsubscribe = agentInstance.subscribe((state) => {
         syncFromAgent(state);
       });
       set({ agent: agentInstance });
+    } else {
+      agentInstance.setNodeName(effectiveName);
     }
 
     try {

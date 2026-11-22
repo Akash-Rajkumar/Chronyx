@@ -165,7 +165,7 @@ export function TestObservationCard({ selectedNode, assessment }: TestObservatio
   return (
     <section
       data-testid="redteam-observation-card"
-      className="bg-card border border-border border-t-2 border-t-accent-cyan/75 rounded-xl p-5 space-y-4"
+      className="w-full h-full flex flex-col bg-card border border-border border-t-2 border-t-accent-cyan/75 rounded-xl p-5 space-y-4"
     >
       <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
         <div>

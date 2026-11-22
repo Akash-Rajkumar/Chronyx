@@ -88,6 +88,9 @@ export function setupGateway(
           socket.join(`node:${node.id}`);
           nodeRegistry.markNodeConnected(node.id, socket.id);
 
+          const connectedNode = nodeRegistry.getNodeSync(node.id) ?? node;
+          io.to('dashboard').emit(SOCKET_EVENTS.NODE_UPDATED, { ...connectedNode });
+
           const response = {
             next_seq: nodeRegistry.getExpectedSeq(node.id),
             prev_hash: nodeRegistry.getLastVerifiedHash(node.id),
@@ -167,7 +170,10 @@ export function setupGateway(
 
     // Disconnect cleanup
     socket.on('disconnect', () => {
-      nodeRegistry.markNodeDisconnected(socket.id);
+      const disconnected = nodeRegistry.markNodeDisconnected(socket.id);
+      for (const node of disconnected) {
+        io.to('dashboard').emit(SOCKET_EVENTS.NODE_UPDATED, node);
+      }
     });
   });
 }

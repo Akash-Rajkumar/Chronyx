@@ -141,7 +141,7 @@ export function BenchmarkCard() {
   const activeProgress = useMemo(() => {
     if (!selectedRun) return null;
     const live = progressById[selectedRun.id];
-    const done = live ? live.done : selectedRun.progress.done;
+    const done = Math.max(live ? live.done : 0, selectedRun.progress.done);
     const total = live ? live.total : selectedRun.progress.total;
     const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
     return { done, total, pct };

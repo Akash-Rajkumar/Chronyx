@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AppShell } from './shell/index.js';
+import { LandingPage } from './pages/landing/LandingPage.js';
+import { ObservatoryPage } from './pages/observatory/ObservatoryPage.js';
 import { OverviewPage } from './pages/overview/OverviewPage.js';
 import { NodeDetailPage } from './pages/node/NodeDetailPage.js';
 import { ComparePage } from './pages/compare/ComparePage.js';
@@ -21,9 +23,14 @@ function DashboardLayout() {
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/landing" element={<LandingPage />} />
       <Route path="/join" element={<JoinPage />} />
       <Route element={<DashboardLayout />}>
-        <Route path="/" element={<OverviewPage />} />
+        <Route path="/overview" element={<ObservatoryPage />} />
+        <Route path="/observatory" element={<ObservatoryPage />} />
+        <Route path="/overview-legacy" element={<OverviewPage />} />
+        <Route path="/dashboard" element={<Navigate to="/overview" replace />} />
         <Route path="/nodes/:id" element={<NodeDetailPage />} />
         <Route path="/compare" element={<ComparePage />} />
         <Route path="/redteam" element={<RedTeamPage />} />
@@ -33,7 +40,7 @@ export default function App() {
         <Route path="/incidents/:id" element={<IncidentsPage />} />
         <Route path="/passport" element={<PassportPage />} />
         <Route path="/passport/:id" element={<PassportPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/overview" replace />} />
       </Route>
     </Routes>
   );

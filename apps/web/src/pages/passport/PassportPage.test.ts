@@ -12,8 +12,18 @@ import {
   type PassportLoadState,
 } from './PassportPage.js';
 
-function renderPassportRoute(path: string, initialState?: PassportLoadState): string {
-  const pageElement = createElement(PassportPage, initialState ? { initialState } : null);
+function renderPassportRoute(
+  path: string,
+  initialState?: PassportLoadState,
+  defaultRevealEvidence?: boolean,
+): string {
+  const props: { initialState?: PassportLoadState; defaultRevealEvidence?: boolean } = {};
+  if (initialState) props.initialState = initialState;
+  if (defaultRevealEvidence !== undefined) props.defaultRevealEvidence = defaultRevealEvidence;
+  const pageElement = createElement(
+    PassportPage,
+    Object.keys(props).length > 0 ? props : null,
+  );
   return renderToString(
     createElement(
       MemoryRouter,
@@ -81,30 +91,47 @@ describe('PassportPage (/passport/:id)', () => {
     expect(html).toContain('Retry');
   });
 
-  it('renders contract passport fields accurately without claiming client-side verification', () => {
+  it('masks critical hashes and signature by default with eye reveal toggles, and renders exact contract values when revealed', () => {
     useDashboardStore.getState().setSnapshot(JSON.parse(JSON.stringify(mockSnapshot)));
     useDashboardStore.getState().setConnectionStatus('mock');
 
-    const html = renderPassportRoute(`/passport/${mockPassport.observation_id}`, {
+    const maskedHtml = renderPassportRoute(`/passport/${mockPassport.observation_id}`, {
       kind: 'ready',
       passport: mockPassport,
     }).replace(/<!-- -->/g, '');
 
-    expect(html).toContain('data-testid="passport-detail"');
-    expect(html).toContain('SIMULATED (MOCK)');
-    expect(html).toContain(mockPassport.observation_id);
-    expect(html).toContain(mockPassport.node_id);
-    expect(html).toContain(`href="/nodes/${mockPassport.node_id}"`);
-    expect(html).toContain(mockPassport.state_at_observation);
-    expect(html).toContain('99%');
-    expect(html).toContain('+0.12 ms');
-    expect(html).toContain('±0.28 ms');
-    expect(html).toContain(mockPassport.evidence_hash);
-    expect(html).toContain(mockPassport.chain_head_hash);
-    expect(html).toContain(mockPassport.server_public_key);
-    expect(html).toContain(mockPassport.sig);
-    expect(html).toContain('not verified client-side');
-    expect(html).not.toContain('Cryptographically verified');
+    expect(maskedHtml).toContain('data-testid="passport-detail"');
+    expect(maskedHtml).toContain('SIMULATED (MOCK)');
+    expect(maskedHtml).toContain('Encrypted');
+    expect(maskedHtml).toContain('data-testid="passport-toggle-evidence_hash"');
+    expect(maskedHtml).toContain('data-testid="passport-toggle-chain_head_hash"');
+    expect(maskedHtml).toContain('data-testid="passport-toggle-server_public_key"');
+    expect(maskedHtml).toContain('data-testid="passport-toggle-sig"');
+    expect(maskedHtml).not.toContain(mockPassport.evidence_hash);
+    expect(maskedHtml).not.toContain(mockPassport.sig);
+
+    const revealedHtml = renderPassportRoute(
+      `/passport/${mockPassport.observation_id}`,
+      {
+        kind: 'ready',
+        passport: mockPassport,
+      },
+      true,
+    ).replace(/<!-- -->/g, '');
+
+    expect(revealedHtml).toContain(mockPassport.observation_id);
+    expect(revealedHtml).toContain(mockPassport.node_id);
+    expect(revealedHtml).toContain(`href="/nodes/${mockPassport.node_id}"`);
+    expect(revealedHtml).toContain(mockPassport.state_at_observation);
+    expect(revealedHtml).toContain('99%');
+    expect(revealedHtml).toContain('+0.12 ms');
+    expect(revealedHtml).toContain('±0.28 ms');
+    expect(revealedHtml).toContain(mockPassport.evidence_hash);
+    expect(revealedHtml).toContain(mockPassport.chain_head_hash);
+    expect(revealedHtml).toContain(mockPassport.server_public_key);
+    expect(revealedHtml).toContain(mockPassport.sig);
+    expect(revealedHtml).toContain('not verified client-side');
+    expect(revealedHtml).not.toContain('Cryptographically verified');
   });
 
   it('loads passport via api.getPassport(id) and classifies success, not-found, and error states', async () => {

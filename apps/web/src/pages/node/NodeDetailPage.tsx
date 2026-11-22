@@ -84,10 +84,10 @@ export const NodeDetailPage: React.FC = () => {
           Promise<{ points: HistoryPoint[] } | null>,
           Promise<Observation[] | null>,
         ] = [
-          !storeNode ? api.getNode(id).catch(() => null) : Promise.resolve(null),
-          api.getNodeHistory(id).catch(() => null),
-          api.getObservations().catch(() => null),
-        ];
+            !storeNode ? api.getNode(id).catch(() => null) : Promise.resolve(null),
+            api.getNodeHistory(id).catch(() => null),
+            api.getObservations().catch(() => null),
+          ];
 
         const [nodeRes, historyRes, obsRes] = await Promise.all(promises);
 
@@ -187,7 +187,7 @@ export const NodeDetailPage: React.FC = () => {
   if (!node && !isLoadingApi) {
     return (
       <div className="space-y-6" data-testid="node-detail-not-found">
-        <Link to="/" className="inline-flex items-center text-xs text-[#00E5FF] hover:underline font-mono">
+        <Link to="/overview" className="inline-flex items-center text-xs text-[#00E5FF] hover:underline font-mono">
           &larr; Back to Live Overview
         </Link>
         <div className="bg-[#111622] border border-[#EF4444]/30 rounded-xl p-8 text-center">
@@ -200,7 +200,7 @@ export const NodeDetailPage: React.FC = () => {
           </p>
           <div className="mt-6">
             <Link
-              to="/"
+              to="/overview"
               className="px-4 py-2 bg-[#1e2738] hover:bg-[#28354c] text-slate-200 text-xs font-mono rounded-lg transition-colors inline-block"
             >
               Return to Overview
@@ -225,7 +225,7 @@ export const NodeDetailPage: React.FC = () => {
       {/* Navigation & Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
-          <Link to="/" className="text-xs text-[#00E5FF] hover:underline font-mono">
+          <Link to="/overview" className="text-xs text-[#00E5FF] hover:underline font-mono">
             &larr; Overview
           </Link>
           <span className="text-slate-600">/</span>
@@ -234,11 +234,10 @@ export const NodeDetailPage: React.FC = () => {
           </h1>
           <span
             data-testid="node-kind-badge"
-            className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase tracking-wider ${
-              isReal
+            className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase tracking-wider ${isReal
                 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                 : 'bg-purple-500/10 text-purple-400 border border-purple-500/30'
-            }`}
+              }`}
           >
             {isReal ? 'Real Node' : 'Virtual Node'}
           </span>
@@ -301,9 +300,8 @@ export const NodeDetailPage: React.FC = () => {
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs text-slate-400 font-mono">Connection Status</span>
               <span
-                className={`w-2 h-2 rounded-full ${
-                  node?.online ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
-                }`}
+                className={`w-2 h-2 rounded-full ${node?.online ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
+                  }`}
               />
             </div>
             <div className="text-sm font-mono text-slate-200 mt-1">
@@ -357,9 +355,8 @@ export const NodeDetailPage: React.FC = () => {
               </h3>
               <InfoTip text="Page's Cumulative Sum statistical quality control chart. Detects sudden mean shifts in clock phase residual. Flag threshold h = 4.0\u03C3." />
             </div>
-            <span className={`text-xs font-mono px-2 py-0.5 rounded ${
-              Math.abs(cusumVal) > 4.0 ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/40' : 'bg-[#00E5FF]/10 text-[#00E5FF]'
-            }`}>
+            <span className={`text-xs font-mono px-2 py-0.5 rounded ${Math.abs(cusumVal) > 4.0 ? 'bg-[#EF4444]/20 text-[#EF4444] border border-[#EF4444]/40' : 'bg-[#00E5FF]/10 text-[#00E5FF]'
+              }`}>
               Threshold h = 4.0&sigma;
             </span>
           </div>
@@ -370,9 +367,8 @@ export const NodeDetailPage: React.FC = () => {
             </div>
             <div className="w-full bg-[#1b2332] rounded-full h-2 overflow-hidden">
               <div
-                className={`h-full transition-all duration-300 ${
-                  Math.abs(cusumVal) > 4.0 ? 'bg-[#EF4444]' : 'bg-[#00E5FF]'
-                }`}
+                className={`h-full transition-all duration-300 ${Math.abs(cusumVal) > 4.0 ? 'bg-[#EF4444]' : 'bg-[#00E5FF]'
+                  }`}
                 style={{ width: `${Math.min(100, (Math.abs(cusumVal) / 4.0) * 100)}%` }}
               />
             </div>
@@ -392,9 +388,8 @@ export const NodeDetailPage: React.FC = () => {
               </h3>
               <InfoTip text="Median Absolute Deviation normalized residual score. Robust to burst outlier corruption. Flag threshold |z| = 3.0." />
             </div>
-            <span className={`text-xs font-mono px-2 py-0.5 rounded ${
-              Math.abs(driftZ) > 3.0 ? 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40' : 'bg-[#00E5FF]/10 text-[#00E5FF]'
-            }`}>
+            <span className={`text-xs font-mono px-2 py-0.5 rounded ${Math.abs(driftZ) > 3.0 ? 'bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/40' : 'bg-[#00E5FF]/10 text-[#00E5FF]'
+              }`}>
               Threshold |z| = 3.0
             </span>
           </div>
@@ -405,9 +400,8 @@ export const NodeDetailPage: React.FC = () => {
             </div>
             <div className="w-full bg-[#1b2332] rounded-full h-2 overflow-hidden">
               <div
-                className={`h-full transition-all duration-300 ${
-                  Math.abs(driftZ) > 3.0 ? 'bg-[#F59E0B]' : 'bg-[#00E5FF]'
-                }`}
+                className={`h-full transition-all duration-300 ${Math.abs(driftZ) > 3.0 ? 'bg-[#F59E0B]' : 'bg-[#00E5FF]'
+                  }`}
                 style={{ width: `${Math.min(100, (Math.abs(driftZ) / 3.0) * 100)}%` }}
               />
             </div>
@@ -470,19 +464,17 @@ export const NodeDetailPage: React.FC = () => {
           {/* Stream 3: GNSS Carrier Phase / PPS */}
           <div
             data-testid="stream-gnss"
-            className={`p-3.5 rounded-lg border ${
-              isReal
+            className={`p-3.5 rounded-lg border ${isReal
                 ? 'bg-[#0b0e14]/50 border-[#171e2c]/60 opacity-60'
                 : 'bg-[#0b0e14] border-[#171e2c]'
-            }`}
+              }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-semibold text-slate-300">3. GNSS PPS / Phase</span>
-              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                isReal
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isReal
                   ? 'bg-slate-700/30 text-slate-400 border border-slate-700/50'
                   : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-              }`}>
+                }`}>
                 {isReal ? 'Not Equipped (Virtual Nodes Only)' : 'Active (Sim)'}
               </span>
             </div>
@@ -499,19 +491,17 @@ export const NodeDetailPage: React.FC = () => {
           {/* Stream 4: Camera / Optical Anchor */}
           <div
             data-testid="stream-camera"
-            className={`p-3.5 rounded-lg border ${
-              isReal
+            className={`p-3.5 rounded-lg border ${isReal
                 ? 'bg-[#0b0e14]/50 border-[#171e2c]/60 opacity-60'
                 : 'bg-[#0b0e14] border-[#171e2c]'
-            }`}
+              }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono font-semibold text-slate-300">4. Optical Camera</span>
-              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                isReal
+              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${isReal
                   ? 'bg-slate-700/30 text-slate-400 border border-slate-700/50'
                   : 'bg-purple-500/10 text-purple-400 border border-purple-500/20'
-              }`}>
+                }`}>
                 {isReal ? 'Not Equipped (Virtual Nodes Only)' : 'Active (Sim)'}
               </span>
             </div>

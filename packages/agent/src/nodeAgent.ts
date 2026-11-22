@@ -236,21 +236,35 @@ export class NodeAgent {
     this.notify();
   }
 
+  public setNodeName(nodeName: string): void {
+    const trimmed = nodeName.trim();
+    if (!trimmed) return;
+    this.config.nodeName = trimmed;
+    if (this.identity) {
+      this.identity.nodeName = trimmed;
+    }
+    this.notify();
+  }
+
   /**
    * Initializes identity and key material ahead of registration if not already created.
    * Generates fresh Ed25519 session keys and stores private key strictly in memory.
    */
   public async initIdentity(nodeName?: string): Promise<NodeIdentity> {
-    if (nodeName) {
-      this.config.nodeName = nodeName;
+    if (nodeName && nodeName.trim()) {
+      this.config.nodeName = nodeName.trim();
     }
     if (!this.identity || !this.keyMaterial) {
       const { identity, keyMaterial } = await loadOrCreateIdentity(
         this.config.nodeName,
         this.config.storageKey,
       );
+      identity.nodeName = this.config.nodeName;
       this.identity = identity;
       this.keyMaterial = keyMaterial;
+      this.notify();
+    } else if (this.identity.nodeName !== this.config.nodeName) {
+      this.identity.nodeName = this.config.nodeName;
       this.notify();
     }
     return this.identity;
@@ -261,17 +275,22 @@ export class NodeAgent {
    * Private key material is held exclusively in memory.
    */
   public async register(nodeName?: string): Promise<NodeInfo> {
-    if (nodeName) {
-      this.config.nodeName = nodeName;
+    if (nodeName && nodeName.trim()) {
+      this.config.nodeName = nodeName.trim();
     }
     this.setStatus('registering');
 
     if (!this.identity || !this.keyMaterial) {
-      await this.initIdentity();
+      await this.initIdentity(this.config.nodeName);
+    }
+
+    const effectiveName = this.config.nodeName.trim() || this.identity!.nodeName;
+    if (this.identity) {
+      this.identity.nodeName = effectiveName;
     }
 
     const reqPayload = RegisterNodeReqSchema.parse({
-      name: this.identity!.nodeName,
+      name: effectiveName,
       kind: 'browser',
       public_key: this.identity!.publicKeyBase64,
     });

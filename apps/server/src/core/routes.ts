@@ -1,5 +1,7 @@
 import { Router } from 'express';
+import os from 'os';
 import { z } from 'zod';
+import { logger } from '../logger.js';
 import {
   CONTRACT_VERSION,
   ROUTES,
@@ -10,7 +12,9 @@ import {
   PatchConfigReqSchema,
   ObservationCreateSchema,
   ObservationSchema,
+  ObservationsQuerySchema,
   PassportSchema,
+  JoinInfoSchema,
 } from '@chronyx/contracts';
 import type {
   HistoryPoint,
@@ -22,6 +26,7 @@ import type {
   Observation,
   ObservationStatus,
   Passport,
+  JoinInfo,
   TrustState,
   UUID,
 } from '@chronyx/contracts';
@@ -32,8 +37,21 @@ import { NodeRegistry } from './nodeRegistry.js';
 import { HeartbeatService } from './heartbeatService.js';
 import type { Orchestrator } from './orchestrator.js';
 import type { DatabaseRepositories } from './db/index.js';
+import { AnchorService } from './anchorService.js';
 import { buildSnapshot } from './snapshot.js';
 import { AppError } from '../middleware/error.js';
+
+export function getLocalIpAddress(): string {
+  const ifaces = os.networkInterfaces();
+  for (const name of Object.keys(ifaces)) {
+    for (const net of ifaces[name] || []) {
+      if (net.family === 'IPv4' && !net.internal && net.address) {
+        return net.address;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
 
 export function createCoreRoutes(
   nodeRegistry: NodeRegistry = new NodeRegistry(),
@@ -41,6 +59,7 @@ export function createCoreRoutes(
   orchestrator?: Orchestrator,
   engine?: IEngine,
   db?: DatabaseRepositories | null,
+  anchorService?: AnchorService | null,
 ): Router {
   const router = Router();
 
@@ -51,15 +70,55 @@ export function createCoreRoutes(
       contract_version: CONTRACT_VERSION,
       server_time_ms: Date.now(),
       db: isDbConfigured() ? 'up' : 'down',
-      anchors_ok: false,
+      anchors_ok: anchorService ? anchorService.isOk() : false,
     });
   });
 
   // GET /api/v1/state (Part E2b)
   router.get(ROUTES.STATE, async (_req, res, next) => {
     try {
-      const snapshot = await buildSnapshot(nodeRegistry, orchestrator, engine, db);
+      const snapshot = await buildSnapshot(nodeRegistry, orchestrator, engine, db, anchorService);
       res.json(snapshot);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // GET /api/v1/join-info (Part E2b)
+  router.get(ROUTES.JOIN_INFO, (req, res, next) => {
+    try {
+      const localIp = getLocalIpAddress();
+      const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'http';
+      
+      const rawHost = req.get('host') || `localhost:${process.env.PORT || 3001}`;
+      let serverHost = rawHost;
+      if (serverHost.startsWith('localhost') || serverHost.startsWith('127.0.0.1')) {
+        const portPart = serverHost.includes(':') ? `:${serverHost.split(':')[1]}` : `:${process.env.PORT || 3001}`;
+        serverHost = `${localIp}${portPart}`;
+      }
+      const serverOrigin = `${proto}://${serverHost}`;
+
+      const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173';
+      let webHost = localIp;
+      let webPort = '5173';
+      try {
+        const parsedUrl = new URL(webOrigin);
+        webPort = parsedUrl.port || (parsedUrl.protocol === 'https:' ? '443' : '80');
+        if (parsedUrl.hostname !== 'localhost' && parsedUrl.hostname !== '127.0.0.1') {
+          webHost = parsedUrl.hostname;
+        }
+      } catch {
+        // fallback to localIp:5173
+      }
+      const joinUrl = `${proto}://${webHost}:${webPort}/join`;
+
+      const joinInfo: JoinInfo = {
+        join_url: joinUrl,
+        ws_url: serverOrigin,
+        api_url: serverOrigin,
+      };
+
+      res.json(JoinInfoSchema.parse(joinInfo));
     } catch (err) {
       next(err);
     }
@@ -74,6 +133,7 @@ export function createCoreRoutes(
       }
 
       const node = await nodeRegistry.registerNode(parsed.data);
+      orchestrator?.emitNodeUpdated?.(node);
       res.status(201).json({
         node,
         hub_time_ms: Date.now(),
@@ -156,6 +216,29 @@ export function createCoreRoutes(
     }
   });
 
+  // GET /api/v1/nodes/:id/evidence-bundle (Part E2b)
+  router.get('/api/v1/nodes/:id/evidence-bundle', async (req, res, next) => {
+    try {
+      const nodeId = req.params.id;
+      const node = await nodeRegistry.getNode(nodeId);
+      if (!node) {
+        throw new AppError('NOT_FOUND', `Node ${nodeId} not found`, 404);
+      }
+
+      const assessment = orchestrator?.getLatestAssessment(node.id);
+      res.setHeader('Content-Disposition', `attachment; filename="evidence-${nodeId}.json"`);
+      res.json({
+        node,
+        assessments: assessment ? [assessment] : [],
+        transitions: [],
+        chain_head_hash: assessment?.cusum || '0000000000000000000000000000000000000000000000000000000000000000',
+        anchors: [],
+      });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   // POST /api/v1/heartbeats (Part E2b)
   router.post(ROUTES.HEARTBEATS, async (req, res, next) => {
     try {
@@ -184,22 +267,38 @@ export function createCoreRoutes(
       }
 
       const { status, limit } = parsed.data;
-      let incidents: IncidentSummary[] = [];
+      const byId = new Map<string, IncidentSummary>();
 
       if (db) {
-        const rows = await db.incidents.listByStatus(status, limit);
-        incidents = rows.map((row) => ({
-          id: row.id,
-          node_id: row.node_id,
-          node_name: nodeRegistry.getNodeSync(row.node_id)?.name ?? 'Unknown Node',
-          status: row.status as 'open' | 'closed',
-          opened_at_ms: row.opened_at_ms,
-          closed_at_ms: row.closed_at_ms,
-          peak_error_ms: row.peak_error_ms,
-          detection_latency_s: row.detection_latency_s,
-          cause: row.cause as SuspectedCause,
-        }));
+        try {
+          const rows = await db.incidents.listByStatus(status, limit);
+          for (const row of rows) {
+            byId.set(row.id, {
+              id: row.id,
+              node_id: row.node_id,
+              node_name: nodeRegistry.getNodeSync(row.node_id)?.name ?? 'Unknown Node',
+              status: row.status as 'open' | 'closed',
+              opened_at_ms: row.opened_at_ms,
+              closed_at_ms: row.closed_at_ms,
+              peak_error_ms: row.peak_error_ms,
+              detection_latency_s: row.detection_latency_s,
+              cause: row.cause as SuspectedCause,
+            });
+          }
+        } catch (err) {
+          logger.warn({ err }, 'Failed to query DB incidents; using live orchestrator incidents');
+        }
       }
+
+      if (orchestrator && typeof orchestrator.getIncidents === 'function') {
+        for (const inc of orchestrator.getIncidents(status, limit)) {
+          byId.set(inc.id, inc);
+        }
+      }
+
+      const incidents = Array.from(byId.values())
+        .sort((a, b) => b.opened_at_ms - a.opened_at_ms)
+        .slice(0, limit);
 
       res.json(incidents);
     } catch (err) {
@@ -210,13 +309,36 @@ export function createCoreRoutes(
   // GET /api/v1/incidents/:id (Part E2b)
   router.get('/api/v1/incidents/:id', async (req, res, next) => {
     try {
-      if (!db) {
-        throw new AppError('NOT_FOUND', `Incident ${req.params.id} not found`, 404);
+      const incidentId = req.params.id;
+      const memIncident =
+        orchestrator && typeof orchestrator.getIncidentById === 'function'
+          ? orchestrator.getIncidentById(incidentId)
+          : null;
+
+      if (memIncident) {
+        const anchors =
+          memIncident.evidence.anchors.length > 0
+            ? memIncident.evidence.anchors
+            : anchorService
+              ? anchorService.getAnchors()
+              : [];
+        res.json({
+          ...memIncident,
+          evidence: {
+            ...memIncident.evidence,
+            anchors,
+          },
+        });
+        return;
       }
 
-      const row = await db.incidents.findById(req.params.id);
+      if (!db) {
+        throw new AppError('NOT_FOUND', `Incident ${incidentId} not found`, 404);
+      }
+
+      const row = await db.incidents.findById(incidentId);
       if (!row) {
-        throw new AppError('NOT_FOUND', `Incident ${req.params.id} not found`, 404);
+        throw new AppError('NOT_FOUND', `Incident ${incidentId} not found`, 404);
       }
 
       const evidence = (row.evidence as Record<string, unknown>) ?? {};
@@ -246,6 +368,75 @@ export function createCoreRoutes(
         },
       };
 
+      res.json(incident);
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // GET /api/v1/incidents/:id/export (Part E2b)
+  router.get('/api/v1/incidents/:id/export', async (req, res, next) => {
+    try {
+      const incidentId = req.params.id;
+      const memIncident =
+        orchestrator && typeof orchestrator.getIncidentById === 'function'
+          ? orchestrator.getIncidentById(incidentId)
+          : null;
+
+      if (memIncident) {
+        const anchors =
+          memIncident.evidence.anchors.length > 0
+            ? memIncident.evidence.anchors
+            : anchorService
+              ? anchorService.getAnchors()
+              : [];
+        res.setHeader('Content-Disposition', `attachment; filename="incident-${incidentId}.json"`);
+        res.json({
+          ...memIncident,
+          evidence: {
+            ...memIncident.evidence,
+            anchors,
+          },
+        });
+        return;
+      }
+
+      if (!db) {
+        throw new AppError('NOT_FOUND', `Incident ${incidentId} not found`, 404);
+      }
+
+      const row = await db.incidents.findById(incidentId);
+      if (!row) {
+        throw new AppError('NOT_FOUND', `Incident ${incidentId} not found`, 404);
+      }
+
+      const evidence = (row.evidence as Record<string, unknown>) ?? {};
+      const timeline = Array.isArray(evidence.timeline) ? (evidence.timeline as Incident['timeline']) : [];
+      const assessments = Array.isArray(evidence.assessments) ? (evidence.assessments as Incident['evidence']['assessments']) : [];
+      const anchors = Array.isArray(evidence.anchors) ? (evidence.anchors as Incident['evidence']['anchors']) : [];
+      const fault = (evidence.fault as Incident['evidence']['fault']) ?? null;
+
+      const incident: Incident = {
+        id: row.id,
+        node_id: row.node_id,
+        node_name: nodeRegistry.getNodeSync(row.node_id)?.name ?? 'Unknown Node',
+        status: row.status as 'open' | 'closed',
+        opened_at_ms: row.opened_at_ms,
+        closed_at_ms: row.closed_at_ms,
+        peak_error_ms: row.peak_error_ms,
+        detection_latency_s: row.detection_latency_s,
+        cause: row.cause as SuspectedCause,
+        summary: row.summary,
+        timeline,
+        evidence: {
+          assessments,
+          chain_head_hash: typeof evidence.chain_head_hash === 'string' ? evidence.chain_head_hash : '',
+          anchors,
+          fault,
+        },
+      };
+
+      res.setHeader('Content-Disposition', `attachment; filename="incident-${incidentId}.json"`);
       res.json(incident);
     } catch (err) {
       next(err);
@@ -289,18 +480,51 @@ export function createCoreRoutes(
     }
   });
 
-  // GET /api/v1/anchors (Part E2b pre-T5 stub)
+  // GET /api/v1/anchors (Part E2b)
   router.get(ROUTES.ANCHORS, (_req, res) => {
-    const anchors: AnchorInfo[] = [
-      {
-        host: 'time.nplindia.org',
-        offset_ms: null,
-        rtt_ms: null,
-        ok: false,
-        sampled_at_ms: Date.now(),
-      },
-    ];
+    const anchors: AnchorInfo[] = anchorService
+      ? anchorService.getAnchors()
+      : [
+          {
+            host: 'time.nplindia.org',
+            offset_ms: null,
+            rtt_ms: null,
+            ok: false,
+            sampled_at_ms: Date.now(),
+          },
+        ];
     res.json(anchors);
+  });
+
+  // GET /api/v1/observations (Part E2b)
+  router.get(ROUTES.OBSERVATIONS, async (req, res, next) => {
+    try {
+      if (!db) {
+        res.json([]);
+        return;
+      }
+      const parsed = ObservationsQuerySchema.safeParse(req.query);
+      const nodeId = parsed.success ? (parsed.data.node_id as UUID | undefined) : undefined;
+      const status = parsed.success ? parsed.data.status : undefined;
+      const limit = parsed.success ? parsed.data.limit : 100;
+
+      const rows = await db.observations.list({ nodeId, status, limit });
+      const observations: Observation[] = rows.map((row) => ({
+        id: row.id,
+        node_id: row.node_id,
+        kind: row.kind,
+        observed_at_ms: row.observed_at_ms,
+        payload: (row.payload as Record<string, unknown>) ?? {},
+        status: row.status,
+        confidence: row.confidence,
+        state_at_ingest: row.state_at_ingest,
+        created_at: typeof row.created_at === 'string' ? row.created_at : new Date(row.created_at).toISOString(),
+      }));
+
+      res.json(observations);
+    } catch (err) {
+      next(err);
+    }
   });
 
   // POST /api/v1/observations (Part E2b)

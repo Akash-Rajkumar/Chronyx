@@ -321,7 +321,11 @@ describe('P1-T4 Orchestrator Core & Real-Node Pipeline', () => {
     expect(emittedEvents.some((e) => e.event === SOCKET_EVENTS.TRANSITION)).toBe(true);
 
     const assessEvent = emittedEvents.find((e) => e.event === SOCKET_EVENTS.ASSESSMENTS);
-    expect(assessEvent?.payload).toEqual([testAssessment]);
+    expect(assessEvent?.payload).toEqual(
+      expect.objectContaining({
+        assessments: [testAssessment],
+      }),
+    );
 
     const transEvent = emittedEvents.find((e) => e.event === SOCKET_EVENTS.TRANSITION);
     expect(transEvent?.payload).toEqual(testTransition);

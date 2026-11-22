@@ -133,7 +133,7 @@ export function IncidentsPage() {
 
   useEffect(() => {
     void loadIncidents();
-  }, [loadIncidents]);
+  }, [loadIncidents, storeOpenIncidents.length]);
 
   // Combine store open incidents and fetched incidents (deduplicating by id)
   const allIncidents = useMemo(() => {

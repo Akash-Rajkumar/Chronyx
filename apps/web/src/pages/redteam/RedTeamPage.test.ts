@@ -45,10 +45,9 @@ describe('RedTeamPage (/redteam)', () => {
     expect(html).toContain('animate-pulse');
   });
 
-  it('renders safety banner and empty state when loaded with no nodes', () => {
+  it('renders empty state when loaded with no nodes', () => {
     useDashboardStore.getState().setLoading(false);
     const html = renderRedTeamPage();
-    expect(html).toContain('Software-only simulation. No signals are transmitted.');
     expect(html).toContain('No observatory nodes online');
   });
 
@@ -65,7 +64,6 @@ describe('RedTeamPage (/redteam)', () => {
     useDashboardStore.getState().setSnapshot(snap);
 
     const html = renderRedTeamPage();
-    expect(html).toContain('Software-only simulation. No signals are transmitted.');
     expect(html).toContain('data-testid="redteam-start"');
     expect(html).toContain('data-testid="redteam-active-faults"');
     expect(html).toContain('data-testid="redteam-observation-card"');

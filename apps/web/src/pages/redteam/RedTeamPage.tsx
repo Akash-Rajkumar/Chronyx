@@ -347,14 +347,6 @@ export function RedTeamPage() {
         </div>
       </div>
 
-      {/* Required Safety Banner */}
-      <div
-        role="status"
-        className="bg-amber-500/10 border border-amber-500/30 px-4 py-3 rounded-lg text-xs text-amber-200 font-medium"
-      >
-        Software-only simulation. No signals are transmitted.
-      </div>
-
       {nodes.length === 0 ? (
         <EmptyState
           title="No observatory nodes online"
@@ -369,13 +361,18 @@ export function RedTeamPage() {
           }
         />
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left: Configuration & Controls */}
-          <Card className="space-y-5">
-            {/* Step 1: Pick a node */}
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-foreground">1. Target Node</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div className="space-y-6">
+          {/* Row 1: Full-Width Target Node & Fault Configuration Card */}
+          <Card className="space-y-6">
+            {/* Step 1: Pick a node (Full Horizontal Width) */}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-foreground">1. Target Node</h3>
+                <span className="text-[11px] font-mono text-muted">
+                  {sortedNodes.length} {sortedNodes.length === 1 ? 'node' : 'nodes'} available
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {sortedNodes.map((node) => {
                   const isSelected = selectedNode?.id === node.id;
                   const assessment = assessments[node.id];
@@ -384,8 +381,8 @@ export function RedTeamPage() {
                       key={node.id}
                       type="button"
                       onClick={() => setSelectedNodeId(node.id)}
-                      className={`text-left p-2.5 rounded-lg border transition-colors ${isSelected
-                        ? 'bg-accent-cyan/10 border-accent-cyan text-foreground'
+                      className={`text-left p-3 rounded-lg border transition-colors ${isSelected
+                        ? 'bg-accent-cyan/10 border-accent-cyan text-foreground shadow-[0_0_16px_rgba(61,214,245,0.12)]'
                         : 'bg-background/50 border-border text-muted hover:border-muted/60'
                         }`}
                     >
@@ -397,7 +394,7 @@ export function RedTeamPage() {
                           {node.kind === 'virtual' ? 'Simulated' : 'Real'}
                         </span>
                       </div>
-                      <div className="mt-1.5 flex items-center justify-between">
+                      <div className="mt-2 flex items-center justify-between gap-2">
                         {assessment ? (
                           <StateChip state={assessment.state} size="sm" />
                         ) : (
@@ -413,289 +410,314 @@ export function RedTeamPage() {
               </div>
             </div>
 
-            {/* Step 2: Pick a fault type */}
-            <div className="space-y-2">
-              <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-                <span>2. Fault Type</span>
-                <InfoTip text="Browser nodes only support software agent-shim faults (clock_step, clock_ramp, noise_burst). Virtual nodes support all five." />
-              </h3>
-              <div className="space-y-1.5">
-                {FAULT_TYPE_OPTIONS.map((opt) => {
-                  const allowed = isFaultAllowedForNode(opt.type, selectedNode);
-                  const isSelected = selectedType === opt.type;
-                  const disabledReason =
-                    'Virtual nodes only: browser nodes do not simulate GNSS or camera-trigger streams.';
-                  return (
-                    <button
-                      key={opt.type}
-                      type="button"
-                      disabled={!allowed}
-                      title={!allowed ? disabledReason : opt.description}
-                      onClick={() => setSelectedType(opt.type)}
-                      className={`w-full text-left px-3 py-2 rounded-lg border text-xs transition-colors ${!allowed
-                        ? 'opacity-45 cursor-not-allowed bg-background/30 border-border/50 text-muted'
-                        : isSelected
-                          ? 'bg-accent-cyan/10 border-accent-cyan text-foreground'
-                          : 'bg-background/50 border-border text-muted hover:border-muted/60'
-                        }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-semibold text-foreground">{opt.label}</span>
-                        <span className="font-mono text-[10px] text-muted">{opt.type}</span>
-                      </div>
-                      <p className="text-[11px] text-muted mt-0.5">
-                        {allowed ? opt.description : disabledReason}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Preset Chips */}
-            <div className="space-y-2">
-              <div className="text-xs font-semibold text-muted">Presets (from contract)</div>
-              <div className="flex flex-wrap gap-1.5">
-                {FAULT_PRESETS.map((preset) => {
-                  const allowed = isFaultAllowedForNode(preset.type, selectedNode);
-                  return (
-                    <button
-                      key={preset.id}
-                      type="button"
-                      disabled={!allowed}
-                      title={!allowed ? 'Not supported on browser nodes' : undefined}
-                      onClick={() => applyPreset(preset)}
-                      className={`px-2.5 py-1 rounded-md text-[11px] border transition-colors ${!allowed
-                        ? 'opacity-40 cursor-not-allowed border-border/50 text-muted'
-                        : 'bg-card border-border text-foreground hover:border-accent-cyan/60'
-                        }`}
-                    >
-                      {preset.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Step 3: Parameters */}
-            <div className="space-y-3 border-t border-border/60 pt-3">
-              <h3 className="text-sm font-semibold text-foreground">3. Parameters</h3>
-
-              {(selectedType === 'clock_step' || selectedType === 'camera_delay') && (
-                <label className="block space-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted">Offset (ms)</span>
-                    <span className="font-mono text-foreground tabular-nums">{offsetMs} ms</span>
+            {/* Steps 2 & 3: Balanced Two-Column Controls Inside Full-Width Card */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 border-t border-border/60 pt-5">
+              {/* Step 2: Fault Type + Presets */}
+              <div className="lg:col-span-7 space-y-4">
+                <div className="space-y-2.5">
+                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                    <span>2. Fault Type</span>
+                    <InfoTip text="Browser nodes only support software agent-shim faults (clock_step, clock_ramp, noise_burst). Virtual nodes support all five." />
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {FAULT_TYPE_OPTIONS.map((opt) => {
+                      const allowed = isFaultAllowedForNode(opt.type, selectedNode);
+                      const isSelected = selectedType === opt.type;
+                      const disabledReason =
+                        'Virtual nodes only: browser nodes do not simulate GNSS or camera-trigger streams.';
+                      return (
+                        <button
+                          key={opt.type}
+                          type="button"
+                          disabled={!allowed}
+                          title={!allowed ? disabledReason : opt.description}
+                          onClick={() => setSelectedType(opt.type)}
+                          className={`w-full text-left px-3 py-2.5 rounded-lg border text-xs transition-colors ${!allowed
+                            ? 'opacity-45 cursor-not-allowed bg-background/30 border-border/50 text-muted'
+                            : isSelected
+                              ? 'bg-accent-cyan/10 border-accent-cyan text-foreground'
+                              : 'bg-background/50 border-border text-muted hover:border-muted/60'
+                            }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-semibold text-foreground">{opt.label}</span>
+                            <span className="font-mono text-[10px] text-muted">{opt.type}</span>
+                          </div>
+                          <p className="text-[11px] text-muted mt-1 leading-snug">
+                            {allowed ? opt.description : disabledReason}
+                          </p>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <input
-                    type="range"
-                    min={-50}
-                    max={50}
-                    step={0.5}
-                    value={offsetMs}
-                    onChange={(e) => setOffsetMs(Number(e.target.value))}
-                    className="w-full accent-accent-cyan"
-                  />
-                </label>
-              )}
+                </div>
 
-              {(selectedType === 'clock_ramp' || selectedType === 'gnss_spoof') && (
-                <>
-                  <label className="block space-y-1 text-xs">
+                {/* Preset Chips */}
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold text-muted">Presets (from contract)</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {FAULT_PRESETS.map((preset) => {
+                      const allowed = isFaultAllowedForNode(preset.type, selectedNode);
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          disabled={!allowed}
+                          title={!allowed ? 'Not supported on browser nodes' : undefined}
+                          onClick={() => applyPreset(preset)}
+                          className={`px-2.5 py-1 rounded-md text-[11px] border transition-colors ${!allowed
+                            ? 'opacity-40 cursor-not-allowed border-border/50 text-muted'
+                            : 'bg-background/60 border-border text-foreground hover:border-accent-cyan/60'
+                            }`}
+                        >
+                          {preset.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Step 3: Parameters & Start Action */}
+              <div className="lg:col-span-5 flex flex-col justify-between space-y-4 lg:border-l lg:border-border/60 lg:pl-6">
+                <div className="space-y-3.5">
+                  <h3 className="text-sm font-semibold text-foreground">3. Parameters</h3>
+
+                  {(selectedType === 'clock_step' || selectedType === 'camera_delay') && (
+                    <label className="block space-y-1.5 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-muted">Offset (ms)</span>
+                        <span className="font-mono text-foreground tabular-nums">{offsetMs} ms</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-50}
+                        max={50}
+                        step={0.5}
+                        value={offsetMs}
+                        onChange={(e) => setOffsetMs(Number(e.target.value))}
+                        className="w-full accent-accent-cyan"
+                      />
+                    </label>
+                  )}
+
+                  {(selectedType === 'clock_ramp' || selectedType === 'gnss_spoof') && (
+                    <>
+                      <label className="block space-y-1.5 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted">Drift rate (ms/min)</span>
+                          <span className="font-mono text-foreground tabular-nums">
+                            {rateMsPerMin} ms/min
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={-20}
+                          max={20}
+                          step={0.1}
+                          value={rateMsPerMin}
+                          onChange={(e) => setRateMsPerMin(Number(e.target.value))}
+                          className="w-full accent-accent-cyan"
+                        />
+                      </label>
+                      <label className="block space-y-1.5 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted">Acceleration (ms/min²)</span>
+                          <span className="font-mono text-foreground tabular-nums">
+                            {accelMsPerMin2} ms/min²
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min={0}
+                          max={5}
+                          step={0.05}
+                          value={accelMsPerMin2}
+                          onChange={(e) => setAccelMsPerMin2(Number(e.target.value))}
+                          className="w-full accent-accent-cyan"
+                        />
+                      </label>
+                    </>
+                  )}
+
+                  {selectedType === 'noise_burst' && (
+                    <label className="block space-y-1.5 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-muted">Noise sigma (ms)</span>
+                        <span className="font-mono text-foreground tabular-nums">
+                          {noiseSigmaMs} ms
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min={0.5}
+                        max={20}
+                        step={0.5}
+                        value={noiseSigmaMs}
+                        onChange={(e) => setNoiseSigmaMs(Number(e.target.value))}
+                        className="w-full accent-accent-cyan"
+                      />
+                    </label>
+                  )}
+
+                  <label className="block space-y-1.5 text-xs">
                     <div className="flex justify-between">
-                      <span className="text-muted">Drift rate (ms/min)</span>
+                      <span className="text-muted">Duration (s, 0 = until stopped)</span>
                       <span className="font-mono text-foreground tabular-nums">
-                        {rateMsPerMin} ms/min
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min={-20}
-                      max={20}
-                      step={0.1}
-                      value={rateMsPerMin}
-                      onChange={(e) => setRateMsPerMin(Number(e.target.value))}
-                      className="w-full accent-accent-cyan"
-                    />
-                  </label>
-                  <label className="block space-y-1 text-xs">
-                    <div className="flex justify-between">
-                      <span className="text-muted">Acceleration (ms/min²)</span>
-                      <span className="font-mono text-foreground tabular-nums">
-                        {accelMsPerMin2} ms/min²
+                        {durationS > 0 ? `${durationS} s` : 'Until stopped'}
                       </span>
                     </div>
                     <input
                       type="range"
                       min={0}
-                      max={5}
-                      step={0.05}
-                      value={accelMsPerMin2}
-                      onChange={(e) => setAccelMsPerMin2(Number(e.target.value))}
+                      max={300}
+                      step={10}
+                      value={durationS}
+                      onChange={(e) => setDurationS(Number(e.target.value))}
                       className="w-full accent-accent-cyan"
                     />
                   </label>
-                </>
-              )}
 
-              {selectedType === 'noise_burst' && (
-                <label className="block space-y-1 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-muted">Noise sigma (ms)</span>
-                    <span className="font-mono text-foreground tabular-nums">
-                      {noiseSigmaMs} ms
-                    </span>
-                  </div>
-                  <input
-                    type="range"
-                    min={0.5}
-                    max={20}
-                    step={0.5}
-                    value={noiseSigmaMs}
-                    onChange={(e) => setNoiseSigmaMs(Number(e.target.value))}
-                    className="w-full accent-accent-cyan"
-                  />
-                </label>
-              )}
-
-              <label className="block space-y-1 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted">Duration (s, 0 = until stopped)</span>
-                  <span className="font-mono text-foreground tabular-nums">
-                    {durationS > 0 ? `${durationS} s` : 'Until stopped'}
-                  </span>
+                  {actionError && (
+                    <div className="p-2.5 rounded-lg bg-trust-quarantined/10 border border-trust-quarantined/30 text-xs text-trust-quarantined">
+                      {actionError}
+                    </div>
+                  )}
                 </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={300}
-                  step={10}
-                  value={durationS}
-                  onChange={(e) => setDurationS(Number(e.target.value))}
-                  className="w-full accent-accent-cyan"
-                />
-              </label>
-            </div>
 
-            {actionError && (
-              <div className="p-2.5 rounded-lg bg-trust-quarantined/10 border border-trust-quarantined/30 text-xs text-trust-quarantined">
-                {actionError}
+                <div className="pt-2 flex items-center justify-between gap-3 border-t border-border/50">
+                  <span className="text-[11px] font-mono text-muted truncate">
+                    Target: <span className="text-foreground">{selectedNode?.name ?? '--'}</span>
+                  </span>
+                  <Button
+                    data-testid="redteam-start"
+                    variant="danger"
+                    loading={starting}
+                    disabled={!selectedNode || starting}
+                    onClick={() => void handleStartFault()}
+                  >
+                    Start Fault
+                  </Button>
+                </div>
               </div>
-            )}
-
-            <div className="pt-1 flex items-center gap-3">
-              <Button
-                data-testid="redteam-start"
-                variant="danger"
-                loading={starting}
-                disabled={!selectedNode || starting}
-                onClick={() => void handleStartFault()}
-              >
-                Start Fault
-              </Button>
             </div>
           </Card>
 
-          {/* Right: Active Faults */}
-          <div data-testid="redteam-active-faults">
-            <Card className="space-y-4 h-full">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-foreground">Active Faults</h3>
-                  <p className="text-xs text-muted">
-                    Live server-tracked faults with ground truth and detection latency
-                  </p>
+          {/* Row 2: Active Faults & Submit Test Observation Side by Side */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+            {/* Left: Active Faults */}
+            <div data-testid="redteam-active-faults" className="min-w-0 flex">
+              <section className="w-full h-full flex flex-col bg-card border border-border border-t-2 border-t-trust-quarantined/75 rounded-xl p-5 space-y-4">
+                <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
+                  <div>
+                    <span className="text-[11px] font-mono text-trust-quarantined block">
+                      Live Fault Monitor
+                    </span>
+                    <h3 className="text-base font-semibold text-foreground mt-0.5">
+                      Active Faults
+                    </h3>
+                    <p className="text-xs text-muted">
+                      Live server-tracked faults with ground truth and detection latency
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => void loadActiveFaults()}>
+                    Refresh
+                  </Button>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => void loadActiveFaults()}>
-                  Refresh
-                </Button>
-              </div>
 
-              {faultsError && (
-                <div className="p-2.5 rounded-lg bg-trust-suspect/10 border border-trust-suspect/30 text-xs text-trust-suspect flex items-center justify-between">
-                  <span>{faultsError}</span>
-                  <button
-                    type="button"
-                    onClick={() => void loadActiveFaults()}
-                    className="underline"
-                  >
-                    Retry
-                  </button>
-                </div>
-              )}
+                {faultsError && (
+                  <div className="p-2.5 rounded-lg bg-trust-suspect/10 border border-trust-suspect/30 text-xs text-trust-suspect flex items-center justify-between">
+                    <span>{faultsError}</span>
+                    <button
+                      type="button"
+                      onClick={() => void loadActiveFaults()}
+                      className="underline"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                )}
 
-              {activeFaults.length === 0 ? (
-                <EmptyState
-                  title="No active faults"
-                  description="Select a node and fault type on the left, then click Start Fault to inject a software-only test fault."
-                />
-              ) : (
-                <div className="space-y-3">
-                  {activeFaults.map((fault) => {
-                    const targetNode = nodes.find((n) => n.id === fault.node_id);
-                    const isStopping = stoppingId === fault.id;
-                    return (
-                      <div
-                        key={fault.id}
-                        className="p-3 rounded-lg bg-background/60 border border-border space-y-2 text-xs"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-semibold text-foreground">
-                                {targetNode?.name ?? fault.node_id.slice(0, 8)}
-                              </span>
-                              <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-card border border-border text-accent-cyan">
-                                {fault.type}
-                              </span>
-                              <span className="font-mono text-[10px] text-muted">
-                                ({fault.applies_to})
-                              </span>
+                <div className="flex-1 flex flex-col">
+                  {activeFaults.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center">
+                      <EmptyState
+                        title="No active faults"
+                        description="Select a node and fault type above, then click Start Fault to inject a test fault."
+                      />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {activeFaults.map((fault) => {
+                        const targetNode = nodes.find((n) => n.id === fault.node_id);
+                        const isStopping = stoppingId === fault.id;
+                        return (
+                          <div
+                            key={fault.id}
+                            className="p-3 rounded-lg bg-background/60 border border-border space-y-2 text-xs"
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-semibold text-foreground">
+                                    {targetNode?.name ?? fault.node_id.slice(0, 8)}
+                                  </span>
+                                  <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-card border border-border text-accent-cyan">
+                                    {fault.type}
+                                  </span>
+                                  <span className="font-mono text-[10px] text-muted">
+                                    ({fault.applies_to})
+                                  </span>
+                                </div>
+                                <div className="mt-1 font-mono text-[11px] text-muted tabular-nums">
+                                  Elapsed: {formatElapsed(fault.started_at_ms, nowMs)}
+                                  {fault.error_at_detect_ms !== null && (
+                                    <> · Error at detect: {fault.error_at_detect_ms.toFixed(2)} ms</>
+                                  )}
+                                </div>
+                              </div>
+
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                loading={isStopping}
+                                disabled={isStopping}
+                                onClick={() => void handleStopFault(fault.id)}
+                              >
+                                Stop
+                              </Button>
                             </div>
-                            <div className="mt-1 font-mono text-[11px] text-muted tabular-nums">
-                              Elapsed: {formatElapsed(fault.started_at_ms, nowMs)}
-                              {fault.error_at_detect_ms !== null && (
-                                <> · Error at detect: {fault.error_at_detect_ms.toFixed(2)} ms</>
+
+                            <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                              {fault.detection_latency_s !== null ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md font-mono text-[11px] bg-trust-trusted/10 text-trust-trusted border border-trust-trusted/30 tabular-nums">
+                                  {`Detected in ${fault.detection_latency_s.toFixed(1)} s`}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-md font-mono text-[11px] bg-muted/10 text-muted border border-border">
+                                  Awaiting detection
+                                </span>
                               )}
+                              <span className="font-mono text-[10px] text-muted">
+                                id: {fault.id.slice(0, 8)}
+                              </span>
                             </div>
                           </div>
-
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            loading={isStopping}
-                            disabled={isStopping}
-                            onClick={() => void handleStopFault(fault.id)}
-                          >
-                            Stop
-                          </Button>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-1 border-t border-border/50">
-                          {fault.detection_latency_s !== null ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md font-mono text-[11px] bg-trust-trusted/10 text-trust-trusted border border-trust-trusted/30 tabular-nums">
-                              {`Detected in ${fault.detection_latency_s.toFixed(1)} s`}
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md font-mono text-[11px] bg-muted/10 text-muted border border-border">
-                              Awaiting detection
-                            </span>
-                          )}
-                          <span className="font-mono text-[10px] text-muted">
-                            id: {fault.id.slice(0, 8)}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-              )}
-            </Card>
+              </section>
+            </div>
 
-            <TestObservationCard
-              selectedNode={selectedNode}
-              assessment={selectedNode ? assessments[selectedNode.id] : undefined}
-            />
+            {/* Right: Submit Test Observation */}
+            <div className="min-w-0 flex">
+              <TestObservationCard
+                selectedNode={selectedNode}
+                assessment={selectedNode ? assessments[selectedNode.id] : undefined}
+              />
+            </div>
           </div>
         </div>
       )}

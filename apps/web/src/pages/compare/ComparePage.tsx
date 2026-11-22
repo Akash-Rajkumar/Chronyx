@@ -74,12 +74,12 @@ function pickInjectedGroundTruthMs(
   activeFault: Fault | undefined,
   liveMetrics: LiveMetrics | null,
 ): number | null {
-  if (!activeFault) return null;
+  if (!activeFault || activeFault.status !== 'active') return 0;
   const matchingMetric = liveMetrics?.faults.find((f) => f.fault_id === activeFault.id);
   if (matchingMetric) return matchingMetric.peak_true_error_ms;
   if (activeFault.error_at_detect_ms !== null) return activeFault.error_at_detect_ms;
   if (activeFault.params.offset_ms !== undefined) return activeFault.params.offset_ms;
-  return null;
+  return 0;
 }
 
 function pickChronyxEstimateMs(
@@ -163,9 +163,15 @@ export function ComparePage() {
     }
   }, []);
 
-  useEffect(() => {
-    void fetchLiveMetrics();
-  }, [fetchLiveMetrics, faults.length, recentTransitions.length]);
+  const activeFault = useMemo(
+    () => faults.find((f) => f.status === 'active') ?? faults[faults.length - 1],
+    [faults],
+  );
+
+  const activeFaultNode = useMemo(
+    () => (activeFault ? nodes.find((n) => n.id === activeFault.node_id) : undefined),
+    [activeFault, nodes],
+  );
 
   const handleScenario = async (name: DemoScenarioName) => {
     setScenarioPending(name);
@@ -181,15 +187,9 @@ export function ComparePage() {
     }
   };
 
-  const activeFault = useMemo(
-    () => faults.find((f) => f.status === 'active') ?? faults[faults.length - 1],
-    [faults],
-  );
-
-  const activeFaultNode = useMemo(
-    () => (activeFault ? nodes.find((n) => n.id === activeFault.node_id) : undefined),
-    [activeFault, nodes],
-  );
+  useEffect(() => {
+    void fetchLiveMetrics();
+  }, [fetchLiveMetrics, faults.length, recentTransitions.length, activeFault?.detected_at_ms]);
 
   const latestQuarantine = useMemo(
     () => recentTransitions.find((t) => t.to === 'quarantined'),
@@ -564,18 +564,18 @@ export function ComparePage() {
               <span className="font-mono font-semibold text-foreground tabular-nums">
                 {metricsLoading
                   ? 'Loading...'
-                  : latestFaultMetric?.detection_latency_s !== null &&
-                    latestFaultMetric?.detection_latency_s !== undefined
-                    ? `${latestFaultMetric.detection_latency_s.toFixed(1)} s`
+                  : (latestFaultMetric?.detection_latency_s ?? activeFault?.detection_latency_s) !== null &&
+                    (latestFaultMetric?.detection_latency_s ?? activeFault?.detection_latency_s) !== undefined
+                    ? `${(latestFaultMetric?.detection_latency_s ?? activeFault?.detection_latency_s)!.toFixed(1)} s`
                     : '--'}
               </span>
             </div>
             <div>
               <span className="text-muted">Error at detection: </span>
               <span className="font-mono font-semibold text-foreground tabular-nums">
-                {latestFaultMetric?.error_at_detect_ms !== null &&
-                  latestFaultMetric?.error_at_detect_ms !== undefined
-                  ? formatSignedMs(latestFaultMetric.error_at_detect_ms)
+                {(latestFaultMetric?.error_at_detect_ms ?? activeFault?.error_at_detect_ms) !== null &&
+                  (latestFaultMetric?.error_at_detect_ms ?? activeFault?.error_at_detect_ms) !== undefined
+                  ? formatSignedMs(latestFaultMetric?.error_at_detect_ms ?? activeFault?.error_at_detect_ms)
                   : '--'}
               </span>
             </div>

@@ -60,13 +60,25 @@ export async function loadPassportById(observationId: string): Promise<PassportL
 export interface PassportPageProps {
   /** Optional initial state override used for deterministic SSR/unit tests. */
   initialState?: PassportLoadState;
+  /** Optional initial reveal toggle for evidence fields (defaults to masked/encrypted). */
+  defaultRevealEvidence?: boolean;
+}
+
+type EvidenceFieldKey = 'evidence_hash' | 'chain_head_hash' | 'server_public_key' | 'sig';
+
+function maskValue(value: string): string {
+  const len = Math.max(24, Math.min(64, value.length));
+  return '•'.repeat(len);
 }
 
 /**
  * Timing Passport Page (Part G4.9)
  * Owned by Person 4 (P4-T6)
  */
-export function PassportPage({ initialState }: PassportPageProps) {
+export function PassportPage({
+  initialState,
+  defaultRevealEvidence = false,
+}: PassportPageProps) {
   const { id } = useParams<{ id: string }>();
 
   useEffect(() => {
@@ -84,6 +96,33 @@ export function PassportPage({ initialState }: PassportPageProps) {
     if (!id) return { kind: 'empty' };
     return { kind: 'loading' };
   });
+
+  const [revealed, setRevealed] = useState<Record<EvidenceFieldKey, boolean>>(() => ({
+    evidence_hash: defaultRevealEvidence,
+    chain_head_hash: defaultRevealEvidence,
+    server_public_key: defaultRevealEvidence,
+    sig: defaultRevealEvidence,
+  }));
+
+  const toggleField = (key: EvidenceFieldKey) => {
+    setRevealed((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const allRevealed =
+    revealed.evidence_hash &&
+    revealed.chain_head_hash &&
+    revealed.server_public_key &&
+    revealed.sig;
+
+  const toggleAllFields = () => {
+    const next = !allRevealed;
+    setRevealed({
+      evidence_hash: next,
+      chain_head_hash: next,
+      server_public_key: next,
+      sig: next,
+    });
+  };
 
   const fetchPassport = useCallback(async () => {
     if (!id) {
@@ -363,7 +402,7 @@ export function PassportPage({ initialState }: PassportPageProps) {
 
           {/* Signed Evidence Metadata */}
           <section className="bg-card border border-border rounded-xl p-5 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2 pb-3 border-b border-border">
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 pb-3 border-b border-border">
               <div>
                 <span className="text-[11px] font-mono text-accent-cyan block">
                   Available Evidence
@@ -376,44 +415,110 @@ export function PassportPage({ initialState }: PassportPageProps) {
                   verified client-side in this view)
                 </p>
               </div>
+
+              <button
+                type="button"
+                data-testid="passport-toggle-all-evidence"
+                onClick={toggleAllFields}
+                className="inline-flex items-center gap-1.5 self-start px-3 py-1.5 rounded-lg text-xs font-medium bg-background/70 hover:bg-background border border-border hover:border-accent-cyan/50 text-foreground transition-colors cursor-pointer shrink-0"
+              >
+                {allRevealed ? (
+                  <svg className="w-3.5 h-3.5 text-accent-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                  </svg>
+                ) : (
+                  <svg className="w-3.5 h-3.5 text-accent-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                )}
+                <span>{allRevealed ? 'Hide All' : 'Reveal All'}</span>
+              </button>
             </div>
 
             <div className="bg-background/60 border border-border rounded-lg divide-y divide-border text-xs">
-              <div className="px-3.5 py-3 space-y-1">
-                <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-muted block">
-                  Evidence Hash
-                </span>
-                <code className="font-mono text-foreground break-all block">
-                  {state.passport.evidence_hash}
-                </code>
-              </div>
+              {(
+                [
+                  {
+                    key: 'evidence_hash',
+                    label: 'Evidence Hash',
+                    value: state.passport.evidence_hash,
+                  },
+                  {
+                    key: 'chain_head_hash',
+                    label: 'Chain Head Hash',
+                    value: state.passport.chain_head_hash,
+                  },
+                  {
+                    key: 'server_public_key',
+                    label: 'Server Public Key',
+                    value: state.passport.server_public_key,
+                  },
+                  {
+                    key: 'sig',
+                    label: 'Signature (Ed25519)',
+                    value: state.passport.sig,
+                  },
+                ] as const
+              ).map((field) => {
+                const isVisible = revealed[field.key];
+                return (
+                  <div
+                    key={field.key}
+                    data-testid={`passport-evidence-${field.key}`}
+                    className="px-3.5 py-3 flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-muted">
+                          {field.label}
+                        </span>
+                        {!isVisible && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-accent-cyan/10 border border-accent-cyan/25 text-[9.5px] font-mono uppercase tracking-wider text-accent-cyan/90">
+                            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                            </svg>
+                            Encrypted
+                          </span>
+                        )}
+                      </div>
 
-              <div className="px-3.5 py-3 space-y-1">
-                <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-muted block">
-                  Chain Head Hash
-                </span>
-                <code className="font-mono text-foreground break-all block">
-                  {state.passport.chain_head_hash}
-                </code>
-              </div>
+                      {isVisible ? (
+                        <code className="font-mono text-foreground break-all block select-all">
+                          {field.value}
+                        </code>
+                      ) : (
+                        <code
+                          aria-label={`${field.label} hidden`}
+                          className="font-mono text-muted/80 tracking-[0.16em] break-all block select-none blur-[2px] opacity-80"
+                        >
+                          {maskValue(field.value)}
+                        </code>
+                      )}
+                    </div>
 
-              <div className="px-3.5 py-3 space-y-1">
-                <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-muted block">
-                  Server Public Key
-                </span>
-                <code className="font-mono text-foreground break-all block">
-                  {state.passport.server_public_key}
-                </code>
-              </div>
-
-              <div className="px-3.5 py-3 space-y-1">
-                <span className="text-[10px] font-mono uppercase tracking-[0.1em] text-muted block">
-                  Signature (Ed25519)
-                </span>
-                <code className="font-mono text-foreground break-all block">
-                  {state.passport.sig}
-                </code>
-              </div>
+                    <button
+                      type="button"
+                      data-testid={`passport-toggle-${field.key}`}
+                      onClick={() => toggleField(field.key)}
+                      aria-label={isVisible ? `Hide ${field.label}` : `Reveal ${field.label}`}
+                      title={isVisible ? `Hide ${field.label}` : `Reveal ${field.label}`}
+                      className="h-8 w-8 rounded-lg flex items-center justify-center bg-card/80 hover:bg-accent-cyan/15 border border-border hover:border-accent-cyan/45 text-muted hover:text-accent-cyan transition-colors cursor-pointer shrink-0"
+                    >
+                      {isVisible ? (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" />
+                        </svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </section>
         </div>

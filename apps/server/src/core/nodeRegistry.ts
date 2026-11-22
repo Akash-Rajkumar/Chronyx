@@ -120,6 +120,9 @@ export class NodeRegistry {
     if (existingId) {
       const state = this.nodesById.get(existingId);
       if (state) {
+        if (params.name && params.name.trim() && state.info.name !== params.name.trim()) {
+          state.info.name = params.name.trim();
+        }
         return state.info;
       }
     }
@@ -274,15 +277,18 @@ export class NodeRegistry {
     state.info.last_seen_at = new Date().toISOString();
   }
 
-  markNodeDisconnected(socketId: string): void {
+  markNodeDisconnected(socketId: string): NodeInfo[] {
+    const disconnected: NodeInfo[] = [];
     for (const state of this.nodesById.values()) {
       if (state.connectedSockets.has(socketId)) {
         state.connectedSockets.delete(socketId);
         if (state.connectedSockets.size === 0) {
           state.info.online = false;
+          disconnected.push({ ...state.info });
         }
       }
     }
+    return disconnected;
   }
 
   getExpectedSeq(nodeId: UUID): number {

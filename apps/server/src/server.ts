@@ -10,6 +10,7 @@ import { setupGateway } from './core/gateway.js';
 import { NodeRegistry } from './core/nodeRegistry.js';
 import { HeartbeatService } from './core/heartbeatService.js';
 import { Orchestrator } from './core/orchestrator.js';
+import { AnchorService } from './core/anchorService.js';
 import { registerLabRoutes } from './lab/index.js';
 import { FaultRegistry } from './lab/faultRegistry.js';
 import { LabFaultService } from './lab/faultService.js';
@@ -29,17 +30,16 @@ export interface CreateServerOptions {
   faultService?: IFaultService;
   faultRegistry?: FaultRegistry | { expireAt(nowMs: number): void | Promise<void> };
   initVirtualNodes?: boolean;
+  anchorService?: AnchorService | null;
 }
 
 export function createServer(options?: CreateServerOptions) {
   const app = express();
   const server = http.createServer(app);
 
-  const webOrigin = process.env.WEB_ORIGIN || 'http://localhost:5173';
-
   app.use(
     cors({
-      origin: webOrigin,
+      origin: true,
       credentials: true,
     }),
   );
@@ -47,7 +47,7 @@ export function createServer(options?: CreateServerOptions) {
 
   const io = new SocketIOServer(server, {
     cors: {
-      origin: webOrigin,
+      origin: true,
       methods: ['GET', 'POST'],
       credentials: true,
     },
@@ -109,6 +109,11 @@ export function createServer(options?: CreateServerOptions) {
       newId: () => crypto.randomUUID() as UUID,
     });
 
+  const anchorService =
+    options?.anchorService !== undefined
+      ? options.anchorService
+      : new AnchorService({ db });
+
   // Instantiate Orchestrator (P1-T4)
   const orchestrator =
     options?.orchestrator ??
@@ -118,6 +123,10 @@ export function createServer(options?: CreateServerOptions) {
       db,
       io,
       sim,
+      anchorProvider:
+        options?.anchorService === null
+          ? undefined
+          : () => anchorService?.getStatus() ?? { ok: false, offset_ms: null, sigma_ms: null },
       faultRegistry: options?.faultRegistry ?? faultRegistry,
       faultService: options?.faultService
         ? 'runLifecycle' in options.faultService && typeof options.faultService.runLifecycle === 'function'
@@ -134,7 +143,7 @@ export function createServer(options?: CreateServerOptions) {
   setupGateway(io, nodeRegistry, heartbeatService, orchestrator, engine, db);
 
   // Mount Core Routes
-  app.use(createCoreRoutes(nodeRegistry, heartbeatService, orchestrator, engine, db));
+  app.use(createCoreRoutes(nodeRegistry, heartbeatService, orchestrator, engine, db, anchorService));
 
   const labContext: LabContext = {
     now: () => Date.now(),
@@ -227,6 +236,16 @@ export function createServer(options?: CreateServerOptions) {
         }
       }
 
+      // 4. Start NTP Anchor synchronization service
+      if (anchorService) {
+        anchorService.start();
+        try {
+          await anchorService.poll();
+        } catch (err) {
+          logger.warn({ err }, 'Initial NTP anchor poll failed, continuing with fallback');
+        }
+      }
+
       isInitialized = true;
     })().catch((err) => {
       initPromise = null;
@@ -236,6 +255,10 @@ export function createServer(options?: CreateServerOptions) {
     return initPromise;
   }
 
+  server.on('close', () => {
+    anchorService?.stop();
+  });
+
   return {
     app,
     server,
@@ -243,6 +266,7 @@ export function createServer(options?: CreateServerOptions) {
     nodeRegistry,
     heartbeatService,
     orchestrator,
+    anchorService,
     labContext,
     faultRegistry,
     faultService: faults,
