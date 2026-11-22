@@ -1,14 +1,20 @@
 import type { Server as SocketIOServer, Socket } from 'socket.io';
 import { DEFAULT_ENGINE_CONFIG, SOCKET_EVENTS } from '@chronyx/contracts';
-import type { Heartbeat } from '@chronyx/contracts';
+import type { Heartbeat, IEngine } from '@chronyx/contracts';
 import { NodeRegistry } from './nodeRegistry.js';
 import { HeartbeatService } from './heartbeatService.js';
+import type { Orchestrator } from './orchestrator.js';
+import type { DatabaseRepositories } from './db/index.js';
+import { buildSnapshot } from './snapshot.js';
 import { logger } from '../logger.js';
 
 export function setupGateway(
   io: SocketIOServer,
   nodeRegistry: NodeRegistry,
   heartbeatService: HeartbeatService,
+  orchestrator?: Orchestrator,
+  engine?: IEngine,
+  db?: DatabaseRepositories | null,
 ): void {
   // Socket.IO authentication middleware (Part E2c)
   io.use(async (socket: Socket, next) => {
@@ -45,6 +51,7 @@ export function setupGateway(
 
     // Mark node connected if node_id was set during auth handshake
     if (socket.data.node_id) {
+      socket.join(`node:${socket.data.node_id}`);
       nodeRegistry.markNodeConnected(socket.data.node_id, socket.id);
     }
 
@@ -54,6 +61,13 @@ export function setupGateway(
       SOCKET_EVENTS.NODE_JOIN,
       async (data: { node_id?: string } | undefined, ack?: (response: unknown) => void) => {
         try {
+          if (socket.data.role === 'dashboard') {
+            if (typeof ack === 'function') {
+              ack({ ok: false, error: 'UNAUTHORIZED' });
+            }
+            return;
+          }
+
           const nodeId = socket.data.node_id || data?.node_id;
           if (!nodeId) {
             if (typeof ack === 'function') {
@@ -71,13 +85,14 @@ export function setupGateway(
           }
 
           socket.data.node_id = node.id;
+          socket.join(`node:${node.id}`);
           nodeRegistry.markNodeConnected(node.id, socket.id);
 
           const response = {
             next_seq: nodeRegistry.getExpectedSeq(node.id),
             prev_hash: nodeRegistry.getLastVerifiedHash(node.id),
             hub_time_ms: Date.now(),
-            config: DEFAULT_ENGINE_CONFIG,
+            config: engine?.getConfig() ?? DEFAULT_ENGINE_CONFIG,
           };
 
           if (typeof ack === 'function') {
@@ -109,6 +124,13 @@ export function setupGateway(
       SOCKET_EVENTS.HEARTBEAT,
       async (heartbeat: Heartbeat, ack?: (response: unknown) => void) => {
         try {
+          if (socket.data.role === 'dashboard') {
+            if (typeof ack === 'function') {
+              ack({ ok: false, code: 'BAD_REQUEST' });
+            }
+            return;
+          }
+
           const serverRxMs = Date.now();
           const result = await heartbeatService.verifyAndIngest(heartbeat, serverRxMs);
 
@@ -120,6 +142,25 @@ export function setupGateway(
           if (typeof ack === 'function') {
             ack({ ok: false, code: 'BAD_REQUEST' });
           }
+        }
+      },
+    );
+
+    // 4. DASHBOARD_SUBSCRIBE event (Part E2c)
+    // Dashboard emits 'dashboard:subscribe', ack returns Snapshot, server emits 'snapshot'
+    socket.on(
+      SOCKET_EVENTS.DASHBOARD_SUBSCRIBE,
+      async (_data: unknown, ack?: (response: unknown) => void) => {
+        try {
+          socket.join('dashboard');
+          const snapshot = await buildSnapshot(nodeRegistry, orchestrator, engine, db);
+
+          if (typeof ack === 'function') {
+            ack(snapshot);
+          }
+          socket.emit(SOCKET_EVENTS.SNAPSHOT, snapshot);
+        } catch (err) {
+          logger.error({ err }, 'Error handling dashboard:subscribe');
         }
       },
     );

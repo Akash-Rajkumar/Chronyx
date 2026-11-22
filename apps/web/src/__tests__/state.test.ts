@@ -89,4 +89,136 @@ describe('Zustand Dashboard Store (Phase 5)', () => {
     useDashboardStore.getState().setConnectionStatus('mock');
     expect(useDashboardStore.getState().connectionStatus).toBe('mock');
   });
+
+  describe('Defensive Assessments Payload Hardening (P3)', () => {
+    const updatedAssessment = {
+      ...mockAssessment,
+      confidence: 0.92,
+      z: 0.8,
+    };
+
+    const newNetwork = {
+      ...mockSnapshot.network,
+      score: 95,
+      trusted: 5,
+    };
+
+    const newBaseline = {
+      source: 'model' as const,
+      label: 'Updated Baseline Model',
+      per_node: [
+        {
+          node_id: mockAssessment.node_id,
+          followed_error_ms: 0.12,
+          alarm: false as const,
+        },
+      ],
+      cluster_time_error_ms: 0.05,
+    };
+
+    it('handles array-shaped assessments payload and preserves network/baseline', () => {
+      useDashboardStore.getState().setSnapshot(mockSnapshot);
+      const initialNetwork = useDashboardStore.getState().network;
+      const initialBaseline = useDashboardStore.getState().baseline;
+
+      useDashboardStore.getState().applyAssessments([updatedAssessment]);
+
+      const state = useDashboardStore.getState();
+      expect(state.assessments[mockAssessment.node_id]?.confidence).toBe(0.92);
+      expect(state.assessments[mockAssessment.node_id]?.z).toBe(0.8);
+      // Network and baseline preserved
+      expect(state.network).toEqual(initialNetwork);
+      expect(state.baseline).toEqual(initialBaseline);
+    });
+
+    it('handles object-shaped payload updating assessments, network health, and baseline', () => {
+      useDashboardStore.getState().setSnapshot(mockSnapshot);
+
+      useDashboardStore.getState().applyAssessments({
+        t_ms: 1700000000500,
+        assessments: [updatedAssessment],
+        network: newNetwork,
+        baseline: newBaseline,
+      });
+
+      const state = useDashboardStore.getState();
+      expect(state.assessments[mockAssessment.node_id]?.confidence).toBe(0.92);
+      expect(state.network?.score).toBe(95);
+      expect(state.baseline?.label).toBe('Updated Baseline Model');
+      expect(state.serverTimeMs).toBe(1700000000500);
+    });
+
+    it('handles missing optional fields in object-shaped payload without clearing existing state', () => {
+      useDashboardStore.getState().setSnapshot(mockSnapshot);
+      const initialNetwork = useDashboardStore.getState().network;
+      const initialBaseline = useDashboardStore.getState().baseline;
+
+      // Payload with only assessments (no network, no baseline)
+      useDashboardStore.getState().applyAssessments({
+        assessments: [updatedAssessment],
+      });
+
+      let state = useDashboardStore.getState();
+      expect(state.assessments[mockAssessment.node_id]?.confidence).toBe(0.92);
+      expect(state.network).toEqual(initialNetwork);
+      expect(state.baseline).toEqual(initialBaseline);
+
+      // Payload with only network (no assessments, no baseline)
+      useDashboardStore.getState().applyAssessments({
+        network: newNetwork,
+      });
+
+      state = useDashboardStore.getState();
+      expect(state.network?.score).toBe(95);
+      expect(state.assessments[mockAssessment.node_id]?.confidence).toBe(0.92);
+      expect(state.baseline).toEqual(initialBaseline);
+    });
+
+    it('handles malformed payloads safely without crashing or corrupting valid state', () => {
+      useDashboardStore.getState().setSnapshot(mockSnapshot);
+      const snapshotAssessments = { ...useDashboardStore.getState().assessments };
+      const snapshotNetwork = useDashboardStore.getState().network;
+      const snapshotBaseline = useDashboardStore.getState().baseline;
+
+      // None of these should throw or mutate state
+      useDashboardStore.getState().applyAssessments(null);
+      useDashboardStore.getState().applyAssessments(undefined);
+      useDashboardStore.getState().applyAssessments('invalid-string');
+      useDashboardStore.getState().applyAssessments(12345);
+      useDashboardStore.getState().applyAssessments({});
+      useDashboardStore.getState().applyAssessments({ unknown_field: 999 });
+
+      const state = useDashboardStore.getState();
+      expect(state.assessments).toEqual(snapshotAssessments);
+      expect(state.network).toEqual(snapshotNetwork);
+      expect(state.baseline).toEqual(snapshotBaseline);
+    });
+
+    it('filters out invalid elements from an array payload while applying valid ones', () => {
+      useDashboardStore.getState().setSnapshot(mockSnapshot);
+
+      const mixedPayload = [
+        updatedAssessment,
+        { invalid_node: true, missing_everything: 123 },
+      ];
+
+      useDashboardStore.getState().applyAssessments(mixedPayload);
+
+      const state = useDashboardStore.getState();
+      expect(state.assessments[mockAssessment.node_id]?.confidence).toBe(0.92);
+    });
+
+    it('preserves existing state when all elements in assessments payload are invalid', () => {
+      useDashboardStore.getState().setSnapshot(mockSnapshot);
+      const initialAssessments = { ...useDashboardStore.getState().assessments };
+
+      useDashboardStore.getState().applyAssessments([
+        { bad_node: 1 },
+        { bad_node: 2 },
+      ]);
+
+      const state = useDashboardStore.getState();
+      expect(state.assessments).toEqual(initialAssessments);
+    });
+  });
 });

@@ -6,16 +6,21 @@ import {
   useAnchors,
   useNetworkHealth,
 } from '../state/useDashboardStore.js';
+import { useQrModalStore } from '../state/useQrModalStore.js';
 
 export interface SidebarProps {
   className?: string;
   showPassport?: boolean;
+  onOpenQrModal?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   className = '',
   showPassport = false, // Hidden until implemented (Phase 3 & Correction 2)
+  onOpenQrModal,
 }) => {
+  const storeOpenQrModal = useQrModalStore((s) => s.openQrModal);
+  const handleOpenQr = onOpenQrModal ?? storeOpenQrModal;
   const connectionStatus = useConnectionStatus();
   const anchors = useAnchors();
   const network = useNetworkHealth();
@@ -85,6 +90,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           Join as a Node
         </NavLink>
+
+        <button
+          type="button"
+          onClick={handleOpenQr}
+          data-testid="sidebar-qr-button"
+          className="w-full py-1.5 px-3 rounded-lg border border-border bg-card/60 hover:bg-card hover:border-accent-cyan/30 text-muted hover:text-foreground text-xs font-medium flex items-center justify-center gap-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-accent-cyan/50"
+        >
+          <svg className="w-3.5 h-3.5 text-accent-cyan" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+          </svg>
+          Scan QR to Join
+        </button>
 
         <div className="text-xs text-muted/70 flex flex-col gap-1 px-1">
           <div className="flex items-center justify-between">

@@ -5,6 +5,7 @@
     { "path": "./packages/crypto" },
     { "path": "./packages/engine" },
     { "path": "./packages/sim" },
+    { "path": "./packages/agent" },
     { "path": "./apps/server" },
     { "path": "./apps/web" }
   ]

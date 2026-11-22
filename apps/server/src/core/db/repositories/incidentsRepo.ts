@@ -62,5 +62,16 @@ export class IncidentsRepository {
     }
     return data;
   }
+
+  async clearAll(): Promise<void> {
+    const { error } = await this.client
+      .from('incidents')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (error) {
+      throw new Error(`Failed to clear incidents: ${error.message}`);
+    }
+  }
 }
 

@@ -70,5 +70,16 @@ export class ObservationsRepository {
     }
     return data;
   }
+
+  async clearAll(): Promise<void> {
+    const { error } = await this.client
+      .from('observations')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000');
+
+    if (error) {
+      throw new Error(`Failed to clear observations: ${error.message}`);
+    }
+  }
 }
 

@@ -10,3 +10,4 @@ export * from './Skeleton.js';
 export * from './EmptyState.js';
 export * from './InfoTip.js';
 export * from './ConnectionBanner.js';
+export * from './JoinQrModal.js';

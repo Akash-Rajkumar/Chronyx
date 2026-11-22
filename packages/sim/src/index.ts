@@ -1,12 +1,18 @@
 // Person 2 owns the real simulator implementation (P2-T1)
-import type { ISim, NodeInfo, SimNodeOutput, Fault, UUID } from '@chronyx/contracts';
+import type { Fault, ISim, NodeInfo, SimNodeOutput, UUID } from '@chronyx/contracts';
 import { GENESIS_PREV_HASH } from '@chronyx/contracts';
+
+export { Simulator, createSim } from './sim.js';
+export type { UnsignedNodeSample } from './sim.js';
+export { faultContributionMs, faultCutoffMs } from './faults.js';
+export { fitAxisAlignedEllipse, replayScience, scienceTrial } from './science.js';
+export type { ScienceReplayOptions } from './science.js';
 
 export class StubSim implements ISim {
   private virtualNodes: NodeInfo[] = [];
   private activeFaults: Map<UUID, Fault> = new Map();
 
-  public addVirtualNode(name: string): NodeInfo {
+  public async addVirtualNode(name: string): Promise<NodeInfo> {
     const node: NodeInfo = {
       id: `00000000-0000-0000-0000-00000000000${this.virtualNodes.length + 1}` as UUID,
       name,
@@ -20,7 +26,7 @@ export class StubSim implements ISim {
     return node;
   }
 
-  public step(now_ms: number): SimNodeOutput[] {
+  public async step(now_ms: number): Promise<SimNodeOutput[]> {
     return this.virtualNodes.map((node, idx) => ({
       node,
       heartbeat: {
@@ -51,6 +57,3 @@ export class StubSim implements ISim {
     return 0;
   }
 }
-
-export const createSim = (): ISim => new StubSim();
-

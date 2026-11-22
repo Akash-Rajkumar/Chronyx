@@ -216,6 +216,15 @@ export class NodeRegistry {
   }
 
   /**
+   * Directly registers an authoritative node in memory (e.g. virtual nodes from simulator).
+   * Preserves exact node identity, kind, and public-key mappings.
+   */
+  registerNodeDirect(info: NodeInfo): NodeInfo {
+    this.initNodeState(info);
+    return info;
+  }
+
+  /**
    * Retrieves a node by ID.
    * Checks in-memory first; if missing and DB configured, queries DB.
    */

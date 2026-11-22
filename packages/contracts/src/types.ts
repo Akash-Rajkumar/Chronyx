@@ -1,8 +1,8 @@
-// Frozen Chronyx Contracts v1.0.0 (Part E)
+// Frozen Chronyx Contracts v1.0.1 (Part E, D-001 PATCH 1)
 // All times are milliseconds since Unix epoch as numbers unless Iso string.
 // All JSON keys are snake_case.
 
-export const CONTRACT_VERSION = '1.0.0';
+export const CONTRACT_VERSION = '1.0.1';
 export type UUID = string;
 export type Iso = string; // Iso = ISO-8601 UTC
 
@@ -203,8 +203,8 @@ export interface SimNodeOutput {
 }
 
 export interface ISim {
-  addVirtualNode(name: string): NodeInfo;
-  step(now_ms: number): SimNodeOutput[];
+  addVirtualNode(name: string): Promise<NodeInfo>;
+  step(now_ms: number): Promise<SimNodeOutput[]>;
   applyFault(f: Fault): void;
   stopFault(id: UUID): void;
   faultOffsetMs(node_id: UUID, now_ms: number): number;

@@ -20,6 +20,7 @@ import type {
   ScienceReplayRes,
   JoinInfo,
 } from './types.js';
+import { CONTRACT_VERSION } from './types.js';
 import { GENESIS_PREV_HASH, DEFAULT_ENGINE_CONFIG } from './constants.js';
 
 export const mockNodeInfo: NodeInfo = {
@@ -177,7 +178,7 @@ export const mockBaselineState: BaselineState = {
 };
 
 export const mockSnapshot: Snapshot = {
-  contract_version: '1.0.0',
+  contract_version: CONTRACT_VERSION,
   server_time_ms: 1700000000000,
   nodes: [mockNodeInfo],
   assessments: [mockAssessment],

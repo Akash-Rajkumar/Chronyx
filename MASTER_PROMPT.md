@@ -51,8 +51,8 @@ Keep a STATE BLOCK and print it at the end of every audit and every checkpoint, 
 STATE BLOCK
 Person: X | Branch: person-X/... | Last time report: H+hh:mm
 Done: <task ids> | Current: <task id> | Blocked by: <none or what>
-Decisions: <D-ids and one-line each> | Parking lot: <items>
-Contract version: 1.0.0 | CCRs approved: <none or ids>
+Decisions: D-001 (PATCH 1: Async Sim, Explicit SHA-512, Contract 1.0.1) | Parking lot: <items>
+Contract version: 1.0.1 | CCRs approved: D-001
 ```
 
 ---
@@ -202,7 +202,34 @@ Contracts (Part E) are frozen at v1.0.0. A change is allowed only if it blocks r
 
 ---
 
-## PART E: FROZEN CONTRACTS, CONTRACT v1.0.0
+## PART E: FROZEN CONTRACTS, CONTRACT v1.0.0 (AMENDED TO v1.0.1 VIA D-001)
+
+### E0. Decision Record D-001 (PATCH 1)
+Authoritative amendment to Part E contracts and crypto specifications:
+1. `ISim.addVirtualNode(name): Promise<NodeInfo>`
+2. `ISim.step(now_ms): Promise<SimNodeOutput[]>`
+3. `faultOffsetMs` remains synchronous.
+4. `IEngine.tick` remains synchronous.
+5. The orchestrator must await `sim.step()`.
+6. `packages/crypto`:
+   - `signHash` is async.
+   - `verifyHash` is async.
+   - `canonicalJson` remains synchronous.
+   - `sha256hex` remains synchronous.
+7. Pass SHA-512 explicitly to `@noble/ed25519` using the installed-version-compatible API from `@noble/hashes`:
+   `ed.etc.sha512Sync = (...m) => sha512(ed.etc.concatBytes(...m));`
+   `ed.etc.sha512Async = (...m) => Promise.resolve(ed.etc.sha512Sync(...m));`
+8. P1 must verify signing and verification on a phone over `http://<LAN-IP>`.
+9. P2-T5 benchmarks must not sign heartbeats. They must use an unsigned internal simulator step exported from `packages/sim`.
+10. Set `CONTRACT_VERSION` to `1.0.1`.
+11. Verify that V1 accepts `1.0.x`.
+
+Explicitly preserved:
+- All existing contract schemas except the explicitly authorized version change.
+- All routes.
+- All Socket.IO events and payload schemas.
+- All database tables and migrations.
+- All other frozen interfaces and ownership boundaries.
 
 ### E1. Shared types
 All times are milliseconds since Unix epoch as JSON numbers (fractions allowed) unless a field says Iso. All JSON keys are snake_case.

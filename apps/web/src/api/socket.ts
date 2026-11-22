@@ -9,7 +9,6 @@ import { io, Socket } from 'socket.io-client';
 import { SOCKET_EVENTS, mockSnapshot } from '@chronyx/contracts';
 import type {
   Snapshot,
-  Assessment,
   Transition,
   IncidentSummary,
   Fault,
@@ -17,6 +16,7 @@ import type {
   AnchorInfo,
 } from '@chronyx/contracts';
 import { useDashboardStore } from '../state/useDashboardStore.js';
+import { api } from './client.js';
 
 let socket: Socket | null = null;
 let subscribersCount = 0;
@@ -28,6 +28,20 @@ export const isMockMode = (): boolean => {
 
 export function getDashboardSocket(): Socket | null {
   return socket;
+}
+
+export function getWsUrl(): string {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.['VITE_WS_URL']) {
+    return import.meta.env['VITE_WS_URL'];
+  }
+  if (typeof window !== 'undefined') {
+    // When served from Vite dev server on port 5173 / 4173, gateway is on 3001
+    if (window.location.port === '5173' || window.location.port === '4173') {
+      return `${window.location.protocol}//${window.location.hostname}:3001`;
+    }
+    return window.location.origin;
+  }
+  return 'http://localhost:3001';
 }
 
 export function initDashboardSocket(): () => void {
@@ -43,6 +57,20 @@ export function initDashboardSocket(): () => void {
     };
   }
 
+  // Attempt initial REST snapshot hydration (single non-polling bootstrap) if available
+  if (typeof window !== 'undefined') {
+    void api
+      .getState()
+      .then((snapshot) => {
+        if (snapshot && typeof snapshot === 'object') {
+          useDashboardStore.getState().setSnapshot(snapshot);
+        }
+      })
+      .catch(() => {
+        // Fall back gracefully: socket snapshot event and dashboard:subscribe will hydrate
+      });
+  }
+
   // Live mode: reuse existing socket if already connected or connecting
   if (socket) {
     return () => {
@@ -54,9 +82,7 @@ export function initDashboardSocket(): () => void {
     };
   }
 
-  const wsUrl =
-    (typeof import.meta !== 'undefined' && import.meta.env?.['VITE_WS_URL']) ||
-    (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001');
+  const wsUrl = getWsUrl();
 
   store.setConnectionStatus('connecting');
 
@@ -71,7 +97,12 @@ export function initDashboardSocket(): () => void {
 
   socket.on('connect', () => {
     useDashboardStore.getState().setConnectionStatus('connected');
-    socket?.emit(SOCKET_EVENTS.DASHBOARD_SUBSCRIBE);
+    // Part E2c: Emit dashboard:subscribe with ack callback for immediate snapshot delivery
+    socket?.emit(SOCKET_EVENTS.DASHBOARD_SUBSCRIBE, {}, (ackSnapshot: unknown) => {
+      if (ackSnapshot && typeof ackSnapshot === 'object') {
+        useDashboardStore.getState().setSnapshot(ackSnapshot as Snapshot);
+      }
+    });
   });
 
   socket.on('disconnect', () => {
@@ -88,8 +119,8 @@ export function initDashboardSocket(): () => void {
     useDashboardStore.getState().setSnapshot(snapshot);
   });
 
-  socket.on(SOCKET_EVENTS.ASSESSMENTS, (assessments: Assessment[]) => {
-    useDashboardStore.getState().applyAssessments(assessments);
+  socket.on(SOCKET_EVENTS.ASSESSMENTS, (payload: unknown) => {
+    useDashboardStore.getState().applyAssessments(payload);
   });
 
   socket.on(SOCKET_EVENTS.TRANSITION, (transition: Transition) => {
