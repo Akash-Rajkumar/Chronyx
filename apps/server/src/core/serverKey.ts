@@ -11,7 +11,11 @@ let keyInitializationPromise: Promise<ServerKeyPair> | null = null;
 
 async function initServerKeyPair(): Promise<ServerKeyPair> {
   const envKey = process.env.SERVER_SIGNING_KEY?.trim();
-  if (envKey && /^[0-9a-fA-F]{64}$/.test(envKey)) {
+
+  if (envKey) {
+    if (!/^[0-9a-fA-F]{64}$/.test(envKey)) {
+      throw new Error('SERVER_SIGNING_KEY is malformed: must be a 64-character hexadecimal seed');
+    }
     const privateKey = hexToBytes(envKey);
     const publicKeyBase64 = await getPublicKeyBase64(privateKey);
     return {
@@ -21,6 +25,12 @@ async function initServerKeyPair(): Promise<ServerKeyPair> {
     };
   }
 
+  // Fail-closed in production if signing key is missing
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('SERVER_SIGNING_KEY is required in production environment');
+  }
+
+  // Permitted ephemeral key generation for local development and test environments
   return generateKeyPair();
 }
 
@@ -29,7 +39,10 @@ export async function getServerKeyPair(): Promise<ServerKeyPair> {
     return cachedServerKeyPair;
   }
   if (!keyInitializationPromise) {
-    keyInitializationPromise = initServerKeyPair();
+    keyInitializationPromise = initServerKeyPair().catch((err) => {
+      keyInitializationPromise = null;
+      throw err;
+    });
   }
   cachedServerKeyPair = await keyInitializationPromise;
   return cachedServerKeyPair;

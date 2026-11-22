@@ -229,7 +229,11 @@ describe('Production Passport Endpoint (GET /api/v1/observations/:id/passport)',
       const isValid = await verifyHash(certHash, passport1.sig, keysAfterRestart.publicKeyBase64);
       expect(isValid).toBe(true);
     } finally {
-      process.env.SERVER_SIGNING_KEY = originalKey;
+      if (originalKey !== undefined) {
+        process.env.SERVER_SIGNING_KEY = originalKey;
+      } else {
+        delete process.env.SERVER_SIGNING_KEY;
+      }
       resetServerKeyPair();
     }
   });
@@ -259,5 +263,71 @@ describe('Production Passport Endpoint (GET /api/v1/observations/:id/passport)',
     expect(body.secret_key).toBeUndefined();
     expect(body.secretKey).toBeUndefined();
     expect(JSON.stringify(body)).not.toContain('0123456789abcdef');
+  });
+
+  it('9. fails initialization when SERVER_SIGNING_KEY is malformed', async () => {
+    const originalKey = process.env.SERVER_SIGNING_KEY;
+    try {
+      process.env.SERVER_SIGNING_KEY = 'invalid-short-key';
+      resetServerKeyPair();
+      await expect(getServerKeyPair()).rejects.toThrow(/SERVER_SIGNING_KEY is malformed/);
+    } finally {
+      if (originalKey !== undefined) {
+        process.env.SERVER_SIGNING_KEY = originalKey;
+      } else {
+        delete process.env.SERVER_SIGNING_KEY;
+      }
+      resetServerKeyPair();
+    }
+  });
+
+  it('10. fails initialization when SERVER_SIGNING_KEY is missing in production environment', async () => {
+    const originalKey = process.env.SERVER_SIGNING_KEY;
+    const originalEnv = process.env.NODE_ENV;
+    try {
+      delete process.env.SERVER_SIGNING_KEY;
+      process.env.NODE_ENV = 'production';
+      resetServerKeyPair();
+      await expect(getServerKeyPair()).rejects.toThrow(
+        /SERVER_SIGNING_KEY is required in production environment/,
+      );
+    } finally {
+      if (originalKey !== undefined) {
+        process.env.SERVER_SIGNING_KEY = originalKey;
+      } else {
+        delete process.env.SERVER_SIGNING_KEY;
+      }
+      if (originalEnv !== undefined) {
+        process.env.NODE_ENV = originalEnv;
+      } else {
+        delete process.env.NODE_ENV;
+      }
+      resetServerKeyPair();
+    }
+  });
+
+  it('11. permits ephemeral fallback in non-production environments when key is absent', async () => {
+    const originalKey = process.env.SERVER_SIGNING_KEY;
+    const originalEnv = process.env.NODE_ENV;
+    try {
+      delete process.env.SERVER_SIGNING_KEY;
+      process.env.NODE_ENV = 'test';
+      resetServerKeyPair();
+      const keys = await getServerKeyPair();
+      expect(keys.publicKeyBase64).toBeDefined();
+      expect(keys.privateKey).toBeDefined();
+    } finally {
+      if (originalKey !== undefined) {
+        process.env.SERVER_SIGNING_KEY = originalKey;
+      } else {
+        delete process.env.SERVER_SIGNING_KEY;
+      }
+      if (originalEnv !== undefined) {
+        process.env.NODE_ENV = originalEnv;
+      } else {
+        delete process.env.NODE_ENV;
+      }
+      resetServerKeyPair();
+    }
   });
 });
