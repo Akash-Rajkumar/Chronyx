@@ -10,6 +10,11 @@ Chronyx is a software-only timing-verification layer for distributed observatori
 
 Nodes (real browser tabs running a Web Worker agent and server-side simulated virtual nodes) perform two-way time exchanges (`time:ping`) with the Express 4 + Socket.IO 4 hub and submit Ed25519-signed, SHA-256 hash-chained heartbeats every second (`@chronyx/crypto`). On each 1 Hz tick, the server verifies heartbeat signatures and chain continuity, computes each node's clock offset relative to the hub, and runs a cluster consensus and anomaly-detection engine (`@chronyx/engine`) that compares every node against peer consensus and independent streams to assign trust states (`trusted`, `suspect`, `quarantined`, `recovering`) and timing-confidence scores. Quarantined nodes have their observations held from science pipelines, while the server persists state and evidence to Supabase Postgres (using the server-only service-role key with Row Level Security enabled) and broadcasts live updates over Socket.IO to the React + Vite + Tailwind + Zustand web interface.
 
+### Security & Deployment Boundaries
+
+- **Heartbeat & Timing Integrity:** Real browser nodes and virtual nodes authenticate over WebSocket / Gateway using Ed25519 signatures and SHA-256 hash chains verified by `HeartbeatService`.
+- **Observation REST Boundary:** `POST /api/v1/observations` verifies node registration in `NodeRegistry` and binds incoming observations to the node's current cluster trust state (`trusted`, `suspect`, `quarantined`). In accordance with frozen Part E contracts (`ObservationCreateSchema`), individual REST observation requests do not carry per-request cryptographic signatures. Consequently, this endpoint is intended exclusively for isolated, controlled hackathon demo environments and local LAN setups, and must **never** be exposed directly to the public internet without an upgraded authenticated transport (see `docs/DECISIONS.md` D-003).
+
 --- 
 
 ## Setup & Run Instructions

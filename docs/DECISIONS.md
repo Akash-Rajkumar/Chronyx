@@ -50,3 +50,13 @@
 - `CONTRACT_VERSION` is now `1.0.1`.
 - No route, event, or table changes.
 
+## D-003: Observation Ingestion REST Security Boundary & Demo Deployment Scope
+- **Status:** ACCEPTED
+- **Date:** H+15:30
+- **Author:** Person 1 (Platform & Integration Lead)
+- **Context:** Establishing cryptographic and authorization boundaries for the observation submission endpoint (`POST /api/v1/observations`) in the hackathon release.
+- **Decision:**
+  1. **Node Identity & Trust Association:** `POST /api/v1/observations` verifies that `node_id` in the request body matches an active, registered node in `NodeRegistry`. It binds the observation to that node's real-time cluster trust state (`state_at_ingest`) and `confidence` from the Orchestrator assessment engine.
+  2. **Cryptographic Boundary:** Per Part E frozen contracts (`ObservationCreateSchema`), observation payloads do NOT carry an Ed25519 signature or bearer token. Ed25519 signatures authenticate the node on the Gateway WebSocket / Heartbeat channel (`HeartbeatService.verifyHeartbeat`), but the REST observation ingestion endpoint does NOT cryptographically verify caller private-key possession per HTTP request.
+  3. **Deployment Limitation:** `POST /api/v1/observations` is strictly an isolated hackathon demo endpoint designed for local or protected LAN environments. It must NEVER be exposed directly to the untrusted public internet without an approved authentication design (e.g. mTLS or signed observation envelopes).
+
