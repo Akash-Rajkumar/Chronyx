@@ -13,14 +13,14 @@ import { SOCKET_EVENTS } from '@chronyx/contracts';
 import { NodeRegistry } from '../core/nodeRegistry.js';
 import { HeartbeatService } from '../core/heartbeatService.js';
 import { Orchestrator } from '../core/orchestrator.js';
-import { StubEngine } from '@chronyx/engine';
+import { Engine } from '@chronyx/engine';
 import type { DatabaseRepositories } from '../core/db/index.js';
 import type { AssessmentRow, TransitionRow } from '../core/db/schema.js';
 import type { Server } from 'socket.io';
 
 describe('P1-T4 Orchestrator Core & Real-Node Pipeline', () => {
   let nodeRegistry: NodeRegistry;
-  let stubEngine: StubEngine;
+  let stubEngine: Engine;
   let mockEngine: IEngine;
   let mockDb: DatabaseRepositories;
   let mockIo: Server;
@@ -33,7 +33,7 @@ describe('P1-T4 Orchestrator Core & Real-Node Pipeline', () => {
 
   beforeEach(async () => {
     nodeRegistry = new NodeRegistry();
-    stubEngine = new StubEngine();
+    stubEngine = new Engine();
     emittedEvents = [];
     persistedAssessments = [];
     persistedTransitions = [];
@@ -162,6 +162,7 @@ describe('P1-T4 Orchestrator Core & Real-Node Pipeline', () => {
 
   // 3. Engine output is handled according to its frozen type
   it('handles and records EngineTickOutput according to frozen contracts', async () => {
+    nodeRegistry.markNodeConnected(testNodeId, 'test-socket');
     const fixedNow = 1700000002000;
     const orchestrator = new Orchestrator({
       nodeRegistry,
@@ -175,7 +176,7 @@ describe('P1-T4 Orchestrator Core & Real-Node Pipeline', () => {
     expect(Array.isArray(output.assessments)).toBe(true);
     expect(Array.isArray(output.transitions)).toBe(true);
     expect(output.network).toBeDefined();
-    expect(output.network.score).toBe(100);
+    expect(output.network.score).toBe(50);
 
     const state = orchestrator.getState();
     expect(state.lastTickMs).toBe(fixedNow);
@@ -486,13 +487,7 @@ describe('P1-T4 Orchestrator Core & Real-Node Pipeline', () => {
 
   // 11. A stub engine is not misreported as the real engine
   it('accurately identifies whether the configured engine is real or stub', () => {
-    const orchestratorWithStub = new Orchestrator({
-      nodeRegistry,
-      engine: stubEngine,
-    });
-    expect(orchestratorWithStub.isRealEngine()).toBe(false);
-
-    class RealEngine implements IEngine {
+    class StubEngine implements IEngine {
       tick(input: EngineTickInput): EngineTickOutput {
         return stubEngine.tick(input);
       }
@@ -503,9 +498,15 @@ describe('P1-T4 Orchestrator Core & Real-Node Pipeline', () => {
       }
     }
 
+    const orchestratorWithStub = new Orchestrator({
+      nodeRegistry,
+      engine: new StubEngine(),
+    });
+    expect(orchestratorWithStub.isRealEngine()).toBe(false);
+
     const orchestratorWithReal = new Orchestrator({
       nodeRegistry,
-      engine: new RealEngine(),
+      engine: stubEngine,
     });
     expect(orchestratorWithReal.isRealEngine()).toBe(true);
   });

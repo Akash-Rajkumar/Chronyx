@@ -9,7 +9,7 @@ import { createServer } from '../server.js';
 import { NodeRegistry } from '../core/nodeRegistry.js';
 import { HeartbeatService } from '../core/heartbeatService.js';
 import { Orchestrator } from '../core/orchestrator.js';
-import { StubEngine } from '@chronyx/engine';
+import { Engine } from '@chronyx/engine';
 import type { DatabaseRepositories } from '../core/db/index.js';
 import type { IFaultService } from '../ctx.js';
 import { FaultRegistry } from '../lab/faultRegistry.js';
@@ -18,7 +18,7 @@ import { LabFaultService } from '../lab/faultService.js';
 describe('P1-T4 Lab Server Integration Suite', () => {
   let nodeRegistry: NodeRegistry;
   let heartbeatService: HeartbeatService;
-  let stubEngine: StubEngine;
+  let stubEngine: Engine;
   let mockDb: DatabaseRepositories;
 
   const testNodeId = '99999999-9999-4999-8999-999999999999' as UUID;
@@ -27,7 +27,7 @@ describe('P1-T4 Lab Server Integration Suite', () => {
   beforeEach(async () => {
     nodeRegistry = new NodeRegistry();
     heartbeatService = new HeartbeatService(nodeRegistry);
-    stubEngine = new StubEngine();
+    stubEngine = new Engine();
 
     mockDb = {
       incidents: {

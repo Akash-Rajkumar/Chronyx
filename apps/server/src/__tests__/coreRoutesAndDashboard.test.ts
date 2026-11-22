@@ -22,14 +22,14 @@ import { apiErrorMiddleware } from '../middleware/error.js';
 import { NodeRegistry } from '../core/nodeRegistry.js';
 import { HeartbeatService } from '../core/heartbeatService.js';
 import { Orchestrator } from '../core/orchestrator.js';
-import { StubEngine } from '@chronyx/engine';
+import { Engine } from '@chronyx/engine';
 import type { DatabaseRepositories } from '../core/db/index.js';
 import type { IncidentRow } from '../core/db/schema.js';
 
 describe('P1-T4-02B Core REST Routes & Dashboard Subscribe Suite', () => {
   let nodeRegistry: NodeRegistry;
   let heartbeatService: HeartbeatService;
-  let stubEngine: StubEngine;
+  let stubEngine: Engine;
   let orchestrator: Orchestrator;
   let mockDb: DatabaseRepositories;
   let incidentsStore: IncidentRow[];
@@ -40,7 +40,7 @@ describe('P1-T4-02B Core REST Routes & Dashboard Subscribe Suite', () => {
   beforeEach(async () => {
     nodeRegistry = new NodeRegistry();
     heartbeatService = new HeartbeatService(nodeRegistry);
-    stubEngine = new StubEngine();
+    stubEngine = new Engine();
     incidentsStore = [];
 
     // Mock DB Repositories

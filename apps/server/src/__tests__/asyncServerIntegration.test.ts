@@ -5,7 +5,7 @@ import { createServer } from '../server.js';
 import { NodeRegistry } from '../core/nodeRegistry.js';
 import { HeartbeatService } from '../core/heartbeatService.js';
 import { Orchestrator } from '../core/orchestrator.js';
-import { StubEngine } from '@chronyx/engine';
+import { Engine } from '@chronyx/engine';
 
 function createMockSim(overrides?: Partial<ISim>): ISim {
   return {
@@ -29,12 +29,12 @@ function createMockSim(overrides?: Partial<ISim>): ISim {
 describe('D-001 Step 2: Asynchronous Server & Orchestrator Integration Suite', () => {
   let nodeRegistry: NodeRegistry;
   let heartbeatService: HeartbeatService;
-  let stubEngine: StubEngine;
+  let stubEngine: Engine;
 
   beforeEach(() => {
     nodeRegistry = new NodeRegistry();
     heartbeatService = new HeartbeatService(nodeRegistry);
-    stubEngine = new StubEngine();
+    stubEngine = new Engine();
   });
 
   afterEach(() => {
