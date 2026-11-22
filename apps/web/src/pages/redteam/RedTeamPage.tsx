@@ -19,6 +19,7 @@ import { EmptyState } from '../../ui/EmptyState.js';
 import { InfoTip } from '../../ui/InfoTip.js';
 import { Skeleton } from '../../ui/Skeleton.js';
 import { StateChip } from '../../ui/StateChip.js';
+import { TestObservationCard } from './TestObservationCard.js';
 
 interface FaultTypeOption {
   type: FaultType;
@@ -690,6 +691,11 @@ export function RedTeamPage() {
                 </div>
               )}
             </Card>
+
+            <TestObservationCard
+              selectedNode={selectedNode}
+              assessment={selectedNode ? assessments[selectedNode.id] : undefined}
+            />
           </div>
         </div>
       )}
